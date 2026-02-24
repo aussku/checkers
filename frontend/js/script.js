@@ -8,7 +8,7 @@ let gameState = {
 
 function showMenu() {
   content.innerHTML = "";
-  menu.style.display = "block";
+  menu.style.display = "grid";
 }
 
 function showLobby() {
