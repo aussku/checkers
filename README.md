@@ -1,5 +1,5 @@
 # What Are Checkers
-3 Player Checkers is a game based on a classic Checkers game where 2 players play against each other. Checkers, in itself, is a strategy turn-based board game; each player takes turns moving their checkers by specific rules. Players must defend their checkers and defeat the foe's checkers. The game is considered finished once only one of the player's checkers remains on the board; the winner is the one who still has at least one of his checkers.
+3 Player Checkers is a game based on a classic Checkers game where 2 players play against each other. Checkers, in itself, is a strategy turn-based board game; each player takes turns moving their checkers according to specific rules. Players must defend their checkers and defeat the foe's checkers. The game is considered finished once only one of the player's checkers remains on the board; the winner is the one who still has at least one of his checkers.
 
 3 Player Checkers are mostly the same; the differences are in the board, and the movement rules are a bit different.
 
@@ -16,12 +16,12 @@ When first opening the website, three buttons will be visible: "Play Game", "Rul
   - On this page you can choose the settings of the game you may want to host.
 
 # Game Rules
-- Each player has its own colour.
+- Each player has its own color.
 - Each player has 12 checkers.
 - Each player starts on his own side of the board.
-- The game is played in turns moving clockwise.
-- There are 2 types of checkers: regular and "king".
-- If a checker reaches the foe's back row, it turns into a "king".
+- The game is played in turns, moving clockwise.
+- There are 2 types of checkers: regular and "King".
+- If a checker reaches the foe's back row, it turns into a "King".
 
 # Movement Rules
 - Regular checkers
