@@ -8,9 +8,15 @@ let gameState = {
   roomCode: null
 };
 
-socket.on("roomCreated", (room) => {
-  console.log("Room created:", room);
-  gameState.roomCode = room.code;
+socket.on("roomCreated", (data) => {
+  gameState.roomCode = data.code;
+  gameState.players = data.players;
+  gameState.isHost = true;
+  renderLobby();
+});
+
+socket.on("roomUpdate", (data) => {
+  gameState.players = data.players;
   renderLobby();
 });
 
@@ -31,7 +37,13 @@ content.addEventListener("click", (e) => {
   if (id === "hostBtn") hostGame();
   if (id === "joinBtn") joinGame();
   if (id === "backBtn") {
-    if (gameState.roomCode || menu.style.display === "none") {
+    if (gameState.roomCode) {
+      socket.emit("leaveRoom");
+      gameState.roomCode = null;
+      gameState.players = [];
+      gameState.isHost = false;
+      showLobby();
+    } else {
       showMenu();
     }
   }
@@ -41,6 +53,7 @@ content.addEventListener("click", (e) => {
   }
   if (id === "endBtn") showEndScreen();
   if (id === "menuBtn") {
+    socket.emit("leaveRoom"); 
     gameState.roomCode = null;
     gameState.players = [];
     showMenu();
@@ -89,18 +102,29 @@ function hostGame() {
 
 function renderLobby() {
   const playerCount = gameState.players.length;
+  const playersNeeded = 3 - playerCount;
   const canStart = playerCount === 3;
 
+  let statusMessage = playerCount < 3 
+    ? `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? 's' : ''}...` 
+    : "All players connected! Ready to start.";
+
   content.innerHTML = `
-    <h2>Hosting Game...</h2>
-    <p>Room Code: <strong>${gameState.roomCode || "..."}</strong></p>
-    <p>Connected players: ${playerCount}/3</p>
-    <ul>
-      ${gameState.players.map(p => `<li>${p}</li>`).join("")}
+    <h2>Game Lobby</h2>
+    <div class="lobby-card">
+      <p>Room Code: <strong style="letter-spacing: 2px; color: #2ecc71;">${gameState.roomCode}</strong></p>
+      <p id="status-text">${statusMessage}</p>
+      <div class="progress-bar">
+        Connected: ${playerCount}/3
+      </div>
+    </div>
+
+    <ul class="player-list">
+      ${gameState.players.map((p, index) => `<li>Player ${index + 1} ${p.id === socket.id ? '(You)' : ''}</li>`).join("")}
     </ul>
-    <button id="simulateJoinBtn">Simulate Player Join</button>
+
     <button id="startBtn" ${canStart ? "" : "disabled"}>Start Game</button>
-    <button id="backBtn">Cancel</button>
+    <button id="backBtn">Cancel & Leave</button>
   `;
 }
 
