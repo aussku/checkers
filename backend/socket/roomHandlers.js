@@ -33,8 +33,28 @@ function registerRoomHandlers(io, socket) {
     }
   });
 
-  socket.on("leaveRoom", cleanupRoom);
+  socket.on("joinRoom", (code) => {
+    try {
+      const room = joinRoom(code, socket.id);
+      
+      socket.join(room.code);
 
+      socket.emit("joinSuccess", { 
+        code: room.code, 
+        players: room.players 
+      });
+
+      io.to(room.code).emit("roomUpdate", { 
+        code: room.code, 
+        players: room.players 
+      });
+
+    } catch (error) {
+      socket.emit("errorMessage", error.message);
+    }
+  });
+
+  socket.on("leaveRoom", cleanupRoom);
   socket.on("disconnect", cleanupRoom);
 }
 
