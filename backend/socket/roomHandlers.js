@@ -1,24 +1,32 @@
-const { createRoom } = require("../services/roomService");
+const { createRoom, joinRoom } = require("../services/roomService");
 const rooms = require("../store/roomStore");
 
 function registerRoomHandlers(io, socket) {
   const cleanupRoom = () => {
-    for (const [code, room] of rooms.entries()) {
-      const playerIndex = room.players.findIndex(p => p.id === socket.id);
-      if (playerIndex !== -1) {
-        room.players.splice(playerIndex, 1);
-        
-        if (room.players.length === 0) {
-          rooms.delete(code);
-          console.log(`Room ${code} deleted.`);
-        } else {
-          io.to(code).emit("roomUpdate", { code, players: room.players });
+  for (const [code, room] of rooms.entries()) {
+    const playerIndex = room.players.findIndex(p => p.id === socket.id);
+    
+    if (playerIndex !== -1) {
+      room.players.splice(playerIndex, 1);
+      
+      if (room.players.length === 0) {
+        rooms.delete(code);
+      } else {
+        if (socket.id === room.hostId) {
+          room.hostId = room.players[0].id;
         }
-        socket.leave(code);
-        break;
+        
+        io.to(code).emit("roomUpdate", { 
+          code, 
+          players: room.players,
+          hostId: room.hostId 
+        });
       }
+      socket.leave(code);
+      break;
     }
-  };
+  }
+};
 
   socket.on("createRoom", () => {
     try {
