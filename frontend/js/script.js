@@ -16,6 +16,20 @@ socket.on("roomCreated", (data) => {
 });
 
 socket.on("roomUpdate", (data) => {
+  if (gameState.roomCode) {
+    gameState.players = data.players;
+    
+    if (data.hostId === socket.id) {
+      gameState.isHost = true;
+    }
+    
+    renderLobby();
+  }
+});
+
+socket.on("joinSuccess", (data) => {
+  gameState.isHost = false;
+  gameState.roomCode = data.code;
   gameState.players = data.players;
   renderLobby();
 });
@@ -36,22 +50,38 @@ content.addEventListener("click", (e) => {
 
   if (id === "hostBtn") hostGame();
   if (id === "joinBtn") joinGame();
+  
+  if (id === "confirmJoinBtn") {
+    const codeInput = document.getElementById("roomInput");
+    const code = codeInput.value.trim().toUpperCase();
+    
+    if (code.length === 4) {
+      socket.emit("joinRoom", code);
+    } else {
+      alert("Please enter a 4-character code.");
+    }
+  }
+
   if (id === "backBtn") {
     if (gameState.roomCode) {
       socket.emit("leaveRoom");
-      gameState.roomCode = null;
-      gameState.players = [];
-      gameState.isHost = false;
-      showLobby();
-    } else {
-      showMenu();
+    }
+
+    gameState.roomCode = null;
+    gameState.players = [];
+    gameState.isHost = false;
+
+    showMenu();
+  }
+
+  if (id === "startBtn") {
+    if (gameState.players.length === 3) {
+      showGame(); 
     }
   }
-  if (id === "simulateJoinBtn") simulatePlayerJoin();
-  if (id === "startBtn") {
-    if (gameState.players.length === 3) showGame();
-  }
+
   if (id === "endBtn") showEndScreen();
+
   if (id === "menuBtn") {
     socket.emit("leaveRoom"); 
     gameState.roomCode = null;
@@ -95,8 +125,6 @@ function showSettings() {
 }
 
 function hostGame() {
-  gameState.isHost = true;
-  gameState.players = ["You (Host)"];
   socket.emit("createRoom");
 }
 
@@ -105,48 +133,45 @@ function renderLobby() {
   const playersNeeded = 3 - playerCount;
   const canStart = playerCount === 3;
 
-  let statusMessage = playerCount < 3 
-    ? `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? 's' : ''}...` 
-    : "All players connected! Ready to start.";
+  let statusMessage = "";
+  if (playerCount < 3) {
+    statusMessage = `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? 's' : ''}...`;
+  } else {
+    statusMessage = "Ready to begin!";
+  }
 
   content.innerHTML = `
     <h2>Game Lobby</h2>
-    <div class="lobby-card">
-      <p>Room Code: <strong style="letter-spacing: 2px; color: #2ecc71;">${gameState.roomCode}</strong></p>
-      <p id="status-text">${statusMessage}</p>
-      <div class="progress-bar">
-        Connected: ${playerCount}/3
-      </div>
+    <div class="lobby-info">
+      <p>Room Code: <strong style="color: #2ecc71;">${gameState.roomCode}</strong></p>
+      <p>${statusMessage}</p>
+      <p>Connected: ${playerCount}/3</p>
     </div>
 
     <ul class="player-list">
-      ${gameState.players.map((p, index) => `<li>Player ${index + 1} ${p.id === socket.id ? '(You)' : ''}</li>`).join("")}
+      ${gameState.players.map((p, i) => `
+        <li>Player ${i + 1} ${p.id === socket.id ? "<strong>(You)</strong>" : ""}</li>
+      `).join("")}
     </ul>
 
-    <button id="startBtn" ${canStart ? "" : "disabled"}>Start Game</button>
-    <button id="backBtn">Cancel & Leave</button>
+    ${gameState.isHost 
+      ? `<button id="startBtn" ${canStart ? "" : "disabled"}>Start Game</button>` 
+      : `<p><i>Waiting for the host to start the game...</i></p>`
+    }
+    
+    <button id="backBtn">Leave Lobby</button>
   `;
-}
-
-function simulatePlayerJoin() {
-  if (gameState.players.length < 3) {
-    const newPlayerNumber = gameState.players.length + 1;
-    gameState.players.push(`Player ${newPlayerNumber}`);
-    renderLobby();
-  }
 }
 
 function joinGame() {
-  const ip = prompt("Enter host IP address:");
-  if (!ip) return;
-  gameState.isHost = false;
+  menu.style.display = "none";
   content.innerHTML = `
-    <h2>Connecting to ${ip}...</h2>
-    <p>Connection successful (simulated).</p>
-    <button id="enterBtn">Enter Game</button>
+    <h2>Join Game</h2>
+    <p>Enter the 4-character room code:</p>
+    <input type="text" id="roomInput" maxlength="4" placeholder="CODE" style="text-transform: uppercase; font-size: 1.5rem; text-align: center; width: 150px; display: block; margin: 10px auto;">
+    <button id="confirmJoinBtn">Join Room</button>
     <button id="backBtn">Back</button>
   `;
-  document.getElementById("enterBtn").addEventListener("click", showGame);
 }
 
 function showGame() {
