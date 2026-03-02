@@ -174,12 +174,17 @@ function joinGame() {
   `;
 }
 
-function showGame() {
+async function showGame() {
   content.innerHTML = `
     <h2>Game Started</h2>
-    <p>Game board will render here.</p>
+    <div id="boardContainer"></div>
     <button id="endBtn">End Game (Simulate)</button>
   `;
+
+  const response = await fetch("./js/board.svg");
+  const svgText = await response.text();
+
+  document.getElementById("boardContainer").innerHTML = svgText;
 }
 
 function showEndScreen() {
