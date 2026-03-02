@@ -43,6 +43,34 @@ function createRoom(hostId) {
   return room;
 }
 
+function getRoomByCode(code) {
+  return rooms.get(code.toUpperCase());
+}
+
+function joinRoom(code, playerId) {
+  const room = getRoomByCode(code);
+
+  if (!room) {
+    throw new Error("Room not found");
+  }
+
+  if (room.players.length >= room.maxPlayers) {
+    throw new Error("Room is full");
+  }
+
+  const isAlreadyInRoom = room.players.some(p => p.id === playerId);
+  if (isAlreadyInRoom) {
+    throw new Error("You are already in this room");
+  }
+
+  const newPlayer = { id: playerId, ready: false };
+  room.players.push(newPlayer);
+
+  return room;
+}
+
 module.exports = {
   createRoom,
+  joinRoom,
+  getRoomByCode
 };
