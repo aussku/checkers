@@ -64,6 +64,30 @@ function registerRoomHandlers(io, socket) {
 
   socket.on("leaveRoom", cleanupRoom);
   socket.on("disconnect", cleanupRoom);
+
+  socket.on("toggleReady", () => {
+  try {
+    const { room, allReady } = toggleReady(gameState.roomCode, socket.id);
+
+    io.to(room.code).emit("roomUpdate", { 
+      code: room.code, 
+      players: room.players,
+      hostId: room.hostId 
+    });
+
+    if (allReady) {
+      io.to(room.code).emit("startCountdown", 3);
+      
+      setTimeout(() => {
+        if (rooms.has(room.code)) {
+            io.to(room.code).emit("gameStarted");
+        }
+      }, 3000);
+    }
+  } catch (error) {
+    socket.emit("errorMessage", error.message);
+  }
+});
 }
 
 module.exports = registerRoomHandlers;

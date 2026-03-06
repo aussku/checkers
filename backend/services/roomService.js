@@ -69,6 +69,21 @@ function joinRoom(code, playerId) {
   return room;
 }
 
+function toggleReady(roomCode, playerId) {
+  const room = rooms.get(roomCode);
+  if (!room) throw new Error("Room not found");
+
+  const player = room.players.find(p => p.id === playerId);
+  if (player) {
+    player.ready = !player.ready;
+  }
+  
+  // Check if everyone is ready and there are 3 players
+  const allReady = room.players.length === 3 && room.players.every(p => p.ready);
+  
+  return { room, allReady };
+}
+
 module.exports = {
   createRoom,
   joinRoom,
