@@ -122,3 +122,16 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
     padding: 12px 10px;
   }
 }
+
+#boardContainer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+#boardContainer svg {
+  width: min(700px, 100%);
+  height: auto;
+  display: block;
+}
