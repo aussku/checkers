@@ -122,6 +122,38 @@ socket.on("joinSuccess", (data) => {
   renderLobby();
 });
 
+socket.on("startCountdown", (seconds) => {
+  let timeLeft = seconds;
+  const timerDisplay = document.createElement("div");
+  timerDisplay.id = "countdown-overlay";
+  timerDisplay.innerHTML = `<div class="timer-card">Game Starting in ${timeLeft}...</div>`;
+  document.body.appendChild(timerDisplay);
+
+  const interval = setInterval(() => {
+    timeLeft--;
+    if (timeLeft > 0) {
+      timerDisplay.querySelector(".timer-card").innerText = `Game Starting in ${timeLeft}...`;
+    } else {
+      clearInterval(interval);
+      timerDisplay.remove();
+    }
+  }, 1000);
+});
+
+socket.on("cancelCountdown", () => {
+  const overlay = document.getElementById("countdown-overlay");
+  if (overlay) {
+    overlay.remove();
+  }
+});
+
+socket.on("gameStarted", () => {
+  const overlay = document.getElementById("countdown-overlay");
+  if (overlay) overlay.remove();
+
+  showGame();
+});
+
 socket.on("errorMessage", (message) => {
   alert(`Error: ${message}`);
 });
@@ -162,10 +194,8 @@ content.addEventListener("click", (e) => {
     showMenu();
   }
 
-  if (id === "startBtn") {
-    if (gameState.players.length === 3) {
-      showGame(); 
-    }
+  if (id === "readyBtn") {
+    socket.emit("toggleReady");
   }
 
   if (id === "endBtn") showEndScreen();
@@ -221,6 +251,8 @@ function renderLobby() {
   const playersNeeded = 3 - playerCount;
   const canStart = playerCount === 3;
 
+  const me = gameState.players.find(p => p.id === socket.id);
+
   let statusMessage = "";
   if (playerCount < 3) {
     statusMessage = `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? 's' : ''}...`;
@@ -238,14 +270,13 @@ function renderLobby() {
 
     <ul class="player-list">
       ${gameState.players.map((p, i) => `
-        <li>Player ${i + 1} ${p.id === socket.id ? "<strong>(You)</strong>" : ""}</li>
+        <li>${p.ready ? "✅" : "⏳"} Player ${i + 1} ${p.id === socket.id ? "<strong>(You)</strong>" : ""}</li>
       `).join("")}
     </ul>
 
-    ${gameState.isHost 
-      ? `<button id="startBtn" ${canStart ? "" : "disabled"}>Start Game</button>` 
-      : `<p><i>Waiting for the host to start the game...</i></p>`
-    }
+    <button id="readyBtn" class="${me.ready ? 'active' : ''}">
+      ${me.ready ? "Unready" : "Ready Up"}
+    </button>
     
     <button id="backBtn">Leave Lobby</button>
   `;
