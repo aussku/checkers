@@ -35,6 +35,7 @@ function createRoom(hostId) {
     hostId,
     players: [{ id: hostId, ready: false }],
     maxPlayers: 3,
+    countdownTimer: null,
     createdAt: new Date(),
   };
 
@@ -87,5 +88,6 @@ function toggleReady(roomCode, playerId) {
 module.exports = {
   createRoom,
   joinRoom,
-  getRoomByCode
+  getRoomByCode,
+  toggleReady
 };

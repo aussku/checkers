@@ -1,4 +1,4 @@
-const { createRoom, joinRoom } = require("../services/roomService");
+const { createRoom, joinRoom, toggleReady } = require("../services/roomService");
 const rooms = require("../store/roomStore");
 
 function registerRoomHandlers(io, socket) {
@@ -8,6 +8,11 @@ function registerRoomHandlers(io, socket) {
     
     if (playerIndex !== -1) {
       room.players.splice(playerIndex, 1);
+      if (room.countdownTimer) {
+        clearTimeout(room.countdownTimer);
+        room.countdownTimer = null;
+        io.to(code).emit("cancelCountdown");
+      }
       
       if (room.players.length === 0) {
         rooms.delete(code);
@@ -66,8 +71,18 @@ function registerRoomHandlers(io, socket) {
   socket.on("disconnect", cleanupRoom);
 
   socket.on("toggleReady", () => {
-  try {
-    const { room, allReady } = toggleReady(gameState.roomCode, socket.id);
+    try {
+    let roomCode = null;
+    for (const [code, room] of rooms.entries()) {
+      if (room.players.some(p => p.id === socket.id)) {
+        roomCode = code;
+        break;
+      }
+    }
+
+    if (!roomCode) throw new Error("Room not found for this player");
+
+    const { room, allReady } = toggleReady(roomCode, socket.id);
 
     io.to(room.code).emit("roomUpdate", { 
       code: room.code, 
@@ -78,11 +93,18 @@ function registerRoomHandlers(io, socket) {
     if (allReady) {
       io.to(room.code).emit("startCountdown", 3);
       
-      setTimeout(() => {
+      clearTimeout(room.countdownTimer); 
+      room.countdownTimer = setTimeout(() => {
         if (rooms.has(room.code)) {
-            io.to(room.code).emit("gameStarted");
+          io.to(room.code).emit("gameStarted");
         }
       }, 3000);
+    } else {
+      if (room.countdownTimer) {
+        clearTimeout(room.countdownTimer);
+        room.countdownTimer = null;
+        io.to(room.code).emit("cancelCountdown", "Someone unreadied! Waiting for everyone to be ready.");
+      }
     }
   } catch (error) {
     socket.emit("errorMessage", error.message);
