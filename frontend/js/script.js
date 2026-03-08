@@ -5,96 +5,78 @@ const socket = io();
 let gameState = {
   isHost: false,
   players: [],
-  roomCode: null
+  roomCode: null,
 };
 
+// Board state is owned by the server. This is a local rendering copy only.
+let boardState = null;
+
+// ---------------------------------------------------------------------------
+// Board positions (SVG cell centroids — frontend copy for rendering only).
+// Keys follow the scheme "{coord}_{color}", e.g. "1A_blue", "E3_green".
+// Dark sub-sector: rows 1–4 (1=outer), cols A–D (A=left edge)
+// Light sub-sector: rows E–H (E=inner), cols 1–4 (1=left edge)
+// ---------------------------------------------------------------------------
 const boardPositions = {
-  // BLUE (left side)
-  blue_1:  { x: 324.3, y: 194.2 },
-  blue_2:  { x: 415.5, y: 200.4 },
-  blue_3:  { x: 351.5, y: 247.9 },
-  blue_4:  { x: 279.3, y: 277.0 },
-  blue_5:  { x: 394.0, y: 321.0 },
-  blue_6:  { x: 315.4, y: 357.9 },
-  blue_7:  { x: 224.3, y: 374.0 },
-  blue_8:  { x: 165.8, y: 455.0 },
-  blue_9:  { x: 251.4, y: 457.8 },
-  blue_10: { x: 346.1, y: 458.5 },
-  blue_11: { x: 250.5, y: 533.4 },
-  blue_12: { x: 169.3, y: 539.7 },
-
-  // GREEN (right side)
-  green_1:  { x: 632.9, y: 195.1 },
-  green_2:  { x: 701.5, y: 231.9 },
-  green_3:  { x: 583.3, y: 261.6 },
-  green_4:  { x: 660.8, y: 304.9 },
-  green_5:  { x: 743.0, y: 325.5 },
-  green_6:  { x: 614.7, y: 396.3 },
-  green_7:  { x: 706.0, y: 414.5 },
-  green_8:  { x: 798.0, y: 411.9 },
-  green_9:  { x: 708.7, y: 495.6 },
-  green_10: { x: 789.9, y: 492.0 },
-  green_11: { x: 858.4, y: 495.6 },
-  green_12: { x: 804.4, y: 573.8 },
-
-  // RED (bottom side)
-  red_1:  { x: 527.4, y: 646.8 },
-  red_2:  { x: 398.4, y: 678.3 },
-  red_3:  { x: 666.2, y: 706.2 },
-  red_4:  { x: 457.9, y: 718.8 },
-  red_5:  { x: 280.3, y: 725.2 },
-  red_6:  { x: 588.7, y: 736.7 },
-  red_7:  { x: 352.3, y: 754.9 },
-  red_8:  { x: 693.3, y: 762.0 },
-  red_9:  { x: 417.4, y: 804.4 },
-  red_10: { x: 522.8, y: 800.7 },
-  red_11: { x: 635.6, y: 799.8 },
-  red_12: { x: 324.4, y: 810.7 }
+  // RED dark (rot 0°)
+  "4D_red": { x: 460.8, y: 568.0 }, "4C_red": { x: 389.3, y: 604.5 },
+  "3D_red": { x: 465.3, y: 650.0 }, "4B_red": { x: 322.8, y: 638.0 },
+  "3C_red": { x: 400.8, y: 675.3 }, "2D_red": { x: 469.0, y: 725.5 },
+  "4A_red": { x: 257.3, y: 671.0 }, "3B_red": { x: 341.8, y: 696.8 },
+  "2C_red": { x: 410.3, y: 739.8 }, "1D_red": { x: 471.8, y: 796.8 },
+  "3A_red": { x: 282.5, y: 720.0 }, "2B_red": { x: 356.8, y: 752.3 },
+  "1C_red": { x: 417.8, y: 800.5 }, "2A_red": { x: 303.8, y: 766.0 },
+  "1B_red": { x: 368.3, y: 804.3 }, "1A_red": { x: 321.3, y: 808.5 },
+  // BLUE light (rot 60°)
+  "E4_blue": { x: 421.5, y: 500.0 }, "E3_blue": { x: 354.1, y: 456.3 },
+  "F4_blue": { x: 352.7, y: 544.9 }, "E2_blue": { x: 291.9, y: 415.5 },
+  "F3_blue": { x: 298.6, y: 501.7 }, "G4_blue": { x: 289.2, y: 585.9 },
+  "E1_blue": { x: 230.5, y: 375.3 }, "F2_blue": { x: 250.5, y: 461.3 },
+  "G3_blue": { x: 247.5, y: 542.1 }, "H4_blue": { x: 228.9, y: 623.9 },
+  "F1_blue": { x: 200.7, y: 421.6 }, "G2_blue": { x: 209.9, y: 502.1 },
+  "H3_blue": { x: 198.6, y: 579.0 }, "G1_blue": { x: 171.5, y: 463.0 },
+  "H2_blue": { x: 170.6, y: 538.0 }, "H1_blue": { x: 143.5, y: 499.4 },
+  // BLUE dark (rot 120°)
+  "4D_blue": { x: 460.7, y: 432.0 }, "4C_blue": { x: 464.9, y: 351.8 },
+  "3D_blue": { x: 387.5, y: 394.9 }, "4B_blue": { x: 469.1, y: 277.5 },
+  "3C_blue": { x: 397.9, y: 326.4 }, "2D_blue": { x: 320.2, y: 360.4 },
+  "4A_blue": { x: 473.3, y: 204.3 }, "3B_blue": { x: 408.7, y: 264.6 },
+  "2C_blue": { x: 337.2, y: 302.4 }, "1D_blue": { x: 257.1, y: 327.2 },
+  "3A_blue": { x: 418.2, y: 201.6 }, "2B_blue": { x: 353.2, y: 249.8 },
+  "1C_blue": { x: 280.9, y: 278.5 }, "2A_blue": { x: 367.8, y: 197.0 },
+  "1B_blue": { x: 302.4, y: 233.8 }, "1A_blue": { x: 322.2, y: 190.9 },
+  // GREEN light (rot 180°)
+  "E4_green": { x: 539.3, y: 432.0 }, "E3_green": { x: 610.8, y: 395.5 },
+  "F4_green": { x: 534.8, y: 350.0 }, "E2_green": { x: 677.3, y: 362.0 },
+  "F3_green": { x: 599.3, y: 324.8 }, "G4_green": { x: 531.0, y: 274.5 },
+  "E1_green": { x: 742.8, y: 329.0 }, "F2_green": { x: 658.3, y: 303.3 },
+  "G3_green": { x: 589.8, y: 260.3 }, "H4_green": { x: 528.3, y: 203.3 },
+  "F1_green": { x: 717.5, y: 280.0 }, "G2_green": { x: 643.3, y: 247.8 },
+  "H3_green": { x: 582.3, y: 199.5 }, "G1_green": { x: 696.3, y: 234.0 },
+  "H2_green": { x: 631.8, y: 195.8 }, "H1_green": { x: 678.8, y: 191.5 },
+  // GREEN dark (rot 240°)
+  "4D_green": { x: 578.5, y: 500.0 }, "4C_green": { x: 645.9, y: 543.7 },
+  "3D_green": { x: 647.3, y: 455.1 }, "4B_green": { x: 708.1, y: 584.5 },
+  "3C_green": { x: 701.4, y: 498.3 }, "2D_green": { x: 710.8, y: 414.1 },
+  "4A_green": { x: 769.5, y: 624.7 }, "3B_green": { x: 749.5, y: 538.7 },
+  "2C_green": { x: 752.5, y: 457.9 }, "1D_green": { x: 771.1, y: 376.1 },
+  "3A_green": { x: 799.3, y: 578.4 }, "2B_green": { x: 790.1, y: 497.9 },
+  "1C_green": { x: 801.4, y: 421.0 }, "2A_green": { x: 828.5, y: 537.0 },
+  "1B_green": { x: 829.4, y: 462.0 }, "1A_green": { x: 856.5, y: 500.6 },
+  // RED light (rot 300°)
+  "E4_red": { x: 539.3, y: 568.0 }, "E3_red": { x: 535.1, y: 648.2 },
+  "F4_red": { x: 612.5, y: 605.1 }, "E2_red": { x: 530.9, y: 722.5 },
+  "F3_red": { x: 602.1, y: 673.6 }, "G4_red": { x: 679.8, y: 639.6 },
+  "E1_red": { x: 526.7, y: 795.7 }, "F2_red": { x: 591.3, y: 735.4 },
+  "G3_red": { x: 662.8, y: 697.6 }, "H4_red": { x: 742.9, y: 672.8 },
+  "F1_red": { x: 581.8, y: 798.4 }, "G2_red": { x: 646.8, y: 750.2 },
+  "H3_red": { x: 719.1, y: 721.5 }, "G1_red": { x: 632.2, y: 803.0 },
+  "H2_red": { x: 697.6, y: 766.2 }, "H1_red": { x: 677.8, y: 809.1 },
 };
 
-let pieces = [
-  // BLUE
-  { id: "b1", color: "blue", position: "blue_1", king: false },
-  { id: "b2", color: "blue", position: "blue_2", king: false },
-  { id: "b3", color: "blue", position: "blue_3", king: false },
-  { id: "b4", color: "blue", position: "blue_4", king: false },
-  { id: "b5", color: "blue", position: "blue_5", king: false },
-  { id: "b6", color: "blue", position: "blue_6", king: false },
-  { id: "b7", color: "blue", position: "blue_7", king: false },
-  { id: "b8", color: "blue", position: "blue_8", king: false },
-  { id: "b9", color: "blue", position: "blue_9", king: false },
-  { id: "b10", color: "blue", position: "blue_10", king: false },
-  { id: "b11", color: "blue", position: "blue_11", king: false },
-  { id: "b12", color: "blue", position: "blue_12", king: false },
-
-  // GREEN
-  { id: "g1", color: "green", position: "green_1", king: false },
-  { id: "g2", color: "green", position: "green_2", king: false },
-  { id: "g3", color: "green", position: "green_3", king: false },
-  { id: "g4", color: "green", position: "green_4", king: false },
-  { id: "g5", color: "green", position: "green_5", king: false },
-  { id: "g6", color: "green", position: "green_6", king: false },
-  { id: "g7", color: "green", position: "green_7", king: false },
-  { id: "g8", color: "green", position: "green_8", king: false },
-  { id: "g9", color: "green", position: "green_9", king: false },
-  { id: "g10", color: "green", position: "green_10", king: false },
-  { id: "g11", color: "green", position: "green_11", king: false },
-  { id: "g12", color: "green", position: "green_12", king: false },
-
-  // RED
-  { id: "r1", color: "red", position: "red_1", king: false },
-  { id: "r2", color: "red", position: "red_2", king: false },
-  { id: "r3", color: "red", position: "red_3", king: false },
-  { id: "r4", color: "red", position: "red_4", king: false },
-  { id: "r5", color: "red", position: "red_5", king: false },
-  { id: "r6", color: "red", position: "red_6", king: false },
-  { id: "r7", color: "red", position: "red_7", king: false },
-  { id: "r8", color: "red", position: "red_8", king: false },
-  { id: "r9", color: "red", position: "red_9", king: false },
-  { id: "r10", color: "red", position: "red_10", king: false },
-  { id: "r11", color: "red", position: "red_11", king: false },
-  { id: "r12", color: "red", position: "red_12", king: false }
-];
+// ---------------------------------------------------------------------------
+// Socket — lobby events
+// ---------------------------------------------------------------------------
 
 socket.on("roomCreated", (data) => {
   gameState.roomCode = data.code;
@@ -106,11 +88,7 @@ socket.on("roomCreated", (data) => {
 socket.on("roomUpdate", (data) => {
   if (gameState.roomCode) {
     gameState.players = data.players;
-    
-    if (data.hostId === socket.id) {
-      gameState.isHost = true;
-    }
-    
+    if (data.hostId === socket.id) gameState.isHost = true;
     renderLobby();
   }
 });
@@ -142,21 +120,35 @@ socket.on("startCountdown", (seconds) => {
 
 socket.on("cancelCountdown", () => {
   const overlay = document.getElementById("countdown-overlay");
-  if (overlay) {
-    overlay.remove();
-  }
+  if (overlay) overlay.remove();
 });
 
-socket.on("gameStarted", () => {
+// ---------------------------------------------------------------------------
+// Socket — game events
+// ---------------------------------------------------------------------------
+
+socket.on("gameStarted", (data) => {
   const overlay = document.getElementById("countdown-overlay");
   if (overlay) overlay.remove();
 
+  boardState = data.gameState;
   showGame();
+});
+
+// Full state push after any server-side mutation (moves, captures, etc.)
+socket.on("gameState", (state) => {
+  boardState = state;
+  const svg = document.querySelector("#boardContainer svg");
+  if (svg) renderPieces(svg);
 });
 
 socket.on("errorMessage", (message) => {
   alert(`Error: ${message}`);
 });
+
+// ---------------------------------------------------------------------------
+// UI event routing
+// ---------------------------------------------------------------------------
 
 menu.addEventListener("click", (e) => {
   const id = e.target.id;
@@ -170,11 +162,10 @@ content.addEventListener("click", (e) => {
 
   if (id === "hostBtn") hostGame();
   if (id === "joinBtn") joinGame();
-  
+
   if (id === "confirmJoinBtn") {
     const codeInput = document.getElementById("roomInput");
     const code = codeInput.value.trim().toUpperCase();
-    
     if (code.length === 4) {
       socket.emit("joinRoom", code);
     } else {
@@ -183,30 +174,29 @@ content.addEventListener("click", (e) => {
   }
 
   if (id === "backBtn") {
-    if (gameState.roomCode) {
-      socket.emit("leaveRoom");
-    }
-
+    if (gameState.roomCode) socket.emit("leaveRoom");
     gameState.roomCode = null;
     gameState.players = [];
     gameState.isHost = false;
-
     showMenu();
   }
 
-  if (id === "readyBtn") {
-    socket.emit("toggleReady");
-  }
+  if (id === "readyBtn") socket.emit("toggleReady");
 
   if (id === "endBtn") showEndScreen();
 
   if (id === "menuBtn") {
-    socket.emit("leaveRoom"); 
+    socket.emit("leaveRoom");
     gameState.roomCode = null;
     gameState.players = [];
+    boardState = null;
     showMenu();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Screen renderers
+// ---------------------------------------------------------------------------
 
 function showMenu() {
   content.innerHTML = "";
@@ -249,16 +239,11 @@ function hostGame() {
 function renderLobby() {
   const playerCount = gameState.players.length;
   const playersNeeded = 3 - playerCount;
-  const canStart = playerCount === 3;
-
   const me = gameState.players.find(p => p.id === socket.id);
 
-  let statusMessage = "";
-  if (playerCount < 3) {
-    statusMessage = `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? 's' : ''}...`;
-  } else {
-    statusMessage = "Ready to begin!";
-  }
+  const statusMessage = playerCount < 3
+    ? `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? "s" : ""}...`
+    : "Ready to begin!";
 
   content.innerHTML = `
     <h2>Game Lobby</h2>
@@ -267,17 +252,14 @@ function renderLobby() {
       <p>${statusMessage}</p>
       <p>Connected: ${playerCount}/3</p>
     </div>
-
     <ul class="player-list">
       ${gameState.players.map((p, i) => `
         <li>${p.ready ? "✅" : "⏳"} Player ${i + 1} ${p.id === socket.id ? "<strong>(You)</strong>" : ""}</li>
       `).join("")}
     </ul>
-
-    <button id="readyBtn" class="${me.ready ? 'active' : ''}">
+    <button id="readyBtn" class="${me.ready ? "active" : ""}">
       ${me.ready ? "Unready" : "Ready Up"}
     </button>
-    
     <button id="backBtn">Leave Lobby</button>
   `;
 }
@@ -287,11 +269,16 @@ function joinGame() {
   content.innerHTML = `
     <h2>Join Game</h2>
     <p>Enter the 4-character room code:</p>
-    <input type="text" id="roomInput" maxlength="4" placeholder="CODE" style="text-transform: uppercase; font-size: 1.5rem; text-align: center; width: 150px; display: block; margin: 10px auto;">
+    <input type="text" id="roomInput" maxlength="4" placeholder="CODE"
+      style="text-transform: uppercase; font-size: 1.5rem; text-align: center; width: 150px; display: block; margin: 10px auto;">
     <button id="confirmJoinBtn">Join Room</button>
     <button id="backBtn">Back</button>
   `;
 }
+
+// ---------------------------------------------------------------------------
+// Board rendering  (pure display — no game logic lives here)
+// ---------------------------------------------------------------------------
 
 function createPiece(svg, piece) {
   const pos = boardPositions[piece.position];
@@ -338,9 +325,9 @@ function createPiece(svg, piece) {
 }
 
 function renderPieces(svg) {
-  svg.querySelectorAll(".checker-piece").forEach((el) => el.remove());
-
-  for (const piece of pieces) {
+  svg.querySelectorAll(".checker-piece").forEach(el => el.remove());
+  if (!boardState) return;
+  for (const piece of boardState.pieces) {
     createPiece(svg, piece);
   }
 }
