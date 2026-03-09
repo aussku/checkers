@@ -135,3 +135,25 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
   height: auto;
   display: block;
 }
+
+#turnIndicator {
+  text-align: center;
+  padding: 16px;
+  margin: 12px 0;
+  background: rgba(15, 42, 28, 0.8);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+#turnText {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+}

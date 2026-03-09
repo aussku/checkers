@@ -128,6 +128,7 @@ socket.on("cancelCountdown", () => {
 // ---------------------------------------------------------------------------
 
 socket.on("gameStarted", (data) => {
+  console.log("Game started with data:", data);
   const overlay = document.getElementById("countdown-overlay");
   if (overlay) overlay.remove();
 
@@ -137,9 +138,13 @@ socket.on("gameStarted", (data) => {
 
 // Full state push after any server-side mutation (moves, captures, etc.)
 socket.on("gameState", (state) => {
+  console.log("Game state received:", state);
   boardState = state;
   const svg = document.querySelector("#boardContainer svg");
-  if (svg) renderPieces(svg);
+  if (svg) {
+    renderPieces(svg);
+  }
+  updateTurnDisplay();
 });
 
 socket.on("errorMessage", (message) => {
@@ -332,9 +337,37 @@ function renderPieces(svg) {
   }
 }
 
+// Updates the turn display based on the current board state.
+function updateTurnDisplay() {
+  if (!boardState || !boardState.currentTurn || !boardState.colorAssignments) {
+    return; 
+  }
+  
+  const turnText = document.getElementById("turnText");
+  const turnIndicator = document.getElementById("turnIndicator");
+  if (!turnText || !turnIndicator) return;
+  
+  const currentPlayerId = boardState.currentTurn;
+  const currentColor = boardState.colorAssignments[currentPlayerId];
+  
+  let playerNumber;
+  if (currentColor === "red") playerNumber = 1;
+  else if (currentColor === "blue") playerNumber = 2;
+  else if (currentColor === "green") playerNumber = 3;
+
+  turnText.textContent = `Player ${playerNumber}'s Turn`;
+  turnText.style.color = currentColor;
+
+  turnIndicator.style.borderColor = currentColor;
+  turnIndicator.style.boxShadow = `0 0 20px ${currentColor}, 0 4px 12px var(--shadow)`;
+}
+
 async function showGame() {
   content.innerHTML = `
     <h2>Game Started</h2>
+    <div id="turnIndicator">
+      <span id="turnText">Waiting for turn info...</span>
+    </div>
     <div id="boardContainer"></div>
     <button id="endBtn">End Game (Simulate)</button>
   `;
@@ -346,6 +379,7 @@ async function showGame() {
 
   const svg = document.querySelector("#boardContainer svg");
   renderPieces(svg);
+  updateTurnDisplay();
 }
 
 function showEndScreen() {
