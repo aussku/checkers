@@ -10,6 +10,7 @@ let gameState = {
 
 // Board state is owned by the server. This is a local rendering copy only.
 let boardState = null;
+let selectedPieceId = null;
 
 // ---------------------------------------------------------------------------
 // Board positions (SVG cell centroids — frontend copy for rendering only).
@@ -140,15 +141,19 @@ socket.on("gameStarted", (data) => {
 socket.on("gameState", (state) => {
   console.log("Game state received:", state);
   boardState = state;
+
+  if (selectedPieceId) {
+    const stillExists = boardState.pieces.some(p => p.id === selectedPieceId);
+    if (!stillExists) selectedPieceId = null;
+  }
+
   const svg = document.querySelector("#boardContainer svg");
   if (svg) {
+    renderCellTargets(svg);
     renderPieces(svg);
   }
-  updateTurnDisplay();
-});
 
-socket.on("errorMessage", (message) => {
-  alert(`Error: ${message}`);
+  updateTurnDisplay();
 });
 
 // ---------------------------------------------------------------------------
@@ -285,6 +290,29 @@ function joinGame() {
 // Board rendering  (pure display — no game logic lives here)
 // ---------------------------------------------------------------------------
 
+function getMyPlayerId() {
+  return socket.id;
+}
+
+function getMyColor() {
+  if (!boardState || !boardState.colorAssignments) return null;
+  return boardState.colorAssignments[getMyPlayerId()] || null;
+}
+
+function isMyTurn() {
+  return !!boardState && boardState.currentTurn === getMyPlayerId();
+}
+
+function getPieceById(pieceId) {
+  if (!boardState) return null;
+  return boardState.pieces.find(p => p.id === pieceId) || null;
+}
+
+function getPieceAtPosition(position) {
+  if (!boardState) return null;
+  return boardState.pieces.find(p => p.position === position) || null;
+}
+
 function createPiece(svg, piece) {
   const pos = boardPositions[piece.position];
   if (!pos) return;
@@ -295,13 +323,15 @@ function createPiece(svg, piece) {
   group.setAttribute("data-position", piece.position);
   group.style.cursor = "pointer";
 
+  const isSelected = selectedPieceId === piece.id;
+
   const outer = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   outer.setAttribute("cx", pos.x);
   outer.setAttribute("cy", pos.y);
   outer.setAttribute("r", 16);
   outer.setAttribute("fill", piece.color);
-  outer.setAttribute("stroke", "#111");
-  outer.setAttribute("stroke-width", "2.5");
+  outer.setAttribute("stroke", isSelected ? "#ffd700" : "#111");
+  outer.setAttribute("stroke-width", isSelected ? "4" : "2.5");
 
   const inner = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   inner.setAttribute("cx", pos.x);
@@ -326,15 +356,88 @@ function createPiece(svg, piece) {
     group.appendChild(kingMark);
   }
 
+  group.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handlePieceClick(piece.id, svg);
+  });
+
   svg.appendChild(group);
 }
 
 function renderPieces(svg) {
   svg.querySelectorAll(".checker-piece").forEach(el => el.remove());
   if (!boardState) return;
+
   for (const piece of boardState.pieces) {
     createPiece(svg, piece);
   }
+}
+
+function handlePieceClick(pieceId, svg) {
+  if (!boardState) return;
+  if (!isMyTurn()) return;
+
+  const piece = getPieceById(pieceId);
+  if (!piece) return;
+
+  const myColor = getMyColor();
+  if (!myColor) return;
+
+  // Only allow selecting your own pieces
+  if (piece.color !== myColor) return;
+
+  if (selectedPieceId === pieceId) {
+    selectedPieceId = null;
+  } else {
+    selectedPieceId = pieceId;
+  }
+
+  renderPieces(svg);
+}
+
+function renderCellTargets(svg) {
+  svg.querySelectorAll(".board-cell-target").forEach(el => el.remove());
+
+  Object.entries(boardPositions).forEach(([position, pos]) => {
+    const target = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    target.setAttribute("class", "board-cell-target");
+    target.setAttribute("cx", pos.x);
+    target.setAttribute("cy", pos.y);
+    target.setAttribute("r", 18);
+    target.setAttribute("fill", "transparent");
+    target.setAttribute("data-position", position);
+    target.style.cursor = "pointer";
+
+    target.addEventListener("click", () => {
+      handleCellClick(position);
+    });
+
+    svg.appendChild(target);
+  });
+}
+
+function handleCellClick(targetPosition) {
+  if (!boardState) return;
+  if (!isMyTurn()) {
+    console.log("Not your turn");
+    return;
+  }
+  if (!selectedPieceId) {
+    console.log("No piece selected");
+    return;
+  }
+
+  console.log("Emitting move:", {
+    roomCode: gameState.roomCode,
+    pieceId: selectedPieceId,
+    to: targetPosition,
+  });
+
+  socket.emit("makeMove", {
+    roomCode: gameState.roomCode,
+    pieceId: selectedPieceId,
+    to: targetPosition,
+  });
 }
 
 // Updates the turn display based on the current board state.
@@ -378,6 +481,7 @@ async function showGame() {
   document.getElementById("boardContainer").innerHTML = svgText;
 
   const svg = document.querySelector("#boardContainer svg");
+  renderCellTargets(svg);
   renderPieces(svg);
   updateTurnDisplay();
 }
