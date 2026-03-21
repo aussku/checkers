@@ -25,9 +25,16 @@ socket.on("makeMove", ({ roomCode, pieceId, to }) => {
     console.log("applyMove result:", result);
 
     if (!result.ok) {
-      socket.emit("errorMessage", result.error);
-      return;
-    }
+        socket.emit("invalidMove", {
+          pieceId: result.pieceId || pieceId,
+          from: result.from || null,
+          to,
+          error: result.error,
+        });
+
+        socket.emit("errorMessage", result.error);
+        return;
+      }
 
     console.log("Broadcasting updated gameState");
     io.to(roomCode).emit("gameState", room.gameState);

@@ -11,6 +11,8 @@ let gameState = {
 // Board state is owned by the server. This is a local rendering copy only.
 let boardState = null;
 let selectedPieceId = null;
+let invalidPieceId = null;
+let invalidMoveTimer = null;
 
 // ---------------------------------------------------------------------------
 // Board positions (SVG cell centroids — frontend copy for rendering only).
@@ -141,6 +143,7 @@ socket.on("gameStarted", (data) => {
 socket.on("gameState", (state) => {
   console.log("Game state received:", state);
   boardState = state;
+  invalidPieceId = null;
 
   if (selectedPieceId) {
     const stillExists = boardState.pieces.some(p => p.id === selectedPieceId);
@@ -154,6 +157,30 @@ socket.on("gameState", (state) => {
   }
 
   updateTurnDisplay();
+});
+
+socket.on("errorMessage", (message) => {
+  showMoveFeedback(message, "error");
+});
+
+socket.on("invalidMove", ({ pieceId, error }) => {
+  invalidPieceId = pieceId;
+
+  const svg = document.querySelector("#boardContainer svg");
+  if (svg) {
+    renderPieces(svg);
+  }
+
+  showMoveFeedback(error || "Invalid move", "error");
+
+  clearTimeout(invalidMoveTimer);
+  invalidMoveTimer = setTimeout(() => {
+    invalidPieceId = null;
+    const currentSvg = document.querySelector("#boardContainer svg");
+    if (currentSvg) {
+      renderPieces(currentSvg);
+    }
+  }, 450);
 });
 
 // ---------------------------------------------------------------------------
@@ -318,20 +345,24 @@ function createPiece(svg, piece) {
   if (!pos) return;
 
   const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  group.setAttribute("class", "checker-piece");
+  const isSelected = selectedPieceId === piece.id;
+  const isInvalid = invalidPieceId === piece.id;
+
+  group.setAttribute(
+    "class",
+    `checker-piece${isInvalid ? " invalid-move-piece" : ""}`
+  );
   group.setAttribute("data-piece-id", piece.id);
   group.setAttribute("data-position", piece.position);
   group.style.cursor = "pointer";
-
-  const isSelected = selectedPieceId === piece.id;
 
   const outer = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   outer.setAttribute("cx", pos.x);
   outer.setAttribute("cy", pos.y);
   outer.setAttribute("r", 16);
   outer.setAttribute("fill", piece.color);
-  outer.setAttribute("stroke", isSelected ? "#ffd700" : "#111");
-  outer.setAttribute("stroke-width", isSelected ? "4" : "2.5");
+  outer.setAttribute("stroke", isInvalid ? "#ff4d4f" : (isSelected ? "#ffd700" : "#111"));
+  outer.setAttribute("stroke-width", isInvalid ? "4.5" : (isSelected ? "4" : "2.5"));
 
   const inner = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   inner.setAttribute("cx", pos.x);
@@ -440,6 +471,18 @@ function handleCellClick(targetPosition) {
   });
 }
 
+function showMoveFeedback(message, type = "info") {
+  const box = document.getElementById("moveFeedback");
+  if (!box) return;
+
+  box.textContent = message;
+  box.className = type === "error" ? "move-feedback error show" : "move-feedback show";
+
+  setTimeout(() => {
+    box.classList.remove("show");
+  }, 1600);
+}
+
 // Updates the turn display based on the current board state.
 function updateTurnDisplay() {
   if (!boardState || !boardState.currentTurn || !boardState.colorAssignments) {
@@ -471,6 +514,7 @@ async function showGame() {
     <div id="turnIndicator">
       <span id="turnText">Waiting for turn info...</span>
     </div>
+    <div id="moveFeedback" class="move-feedback"></div>
     <div id="boardContainer"></div>
     <button id="endBtn">End Game (Simulate)</button>
   `;
