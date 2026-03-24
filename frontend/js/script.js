@@ -502,9 +502,9 @@ function updateTurnDisplay() {
   const currentColor = boardState.colorAssignments[currentPlayerId];
   
   let playerNumber;
-  if (currentColor === "red") playerNumber = 1;
-  else if (currentColor === "blue") playerNumber = 2;
-  else if (currentColor === "green") playerNumber = 3;
+  if (currentColor === "blue") playerNumber = 1;
+  else if (currentColor === "green") playerNumber = 2;
+  else if (currentColor === "red") playerNumber = 3;
 
   turnText.textContent = `Player ${playerNumber}'s Turn`;
   turnText.style.color = currentColor;
