@@ -235,12 +235,14 @@ content.addEventListener("click", (e) => {
 // ---------------------------------------------------------------------------
 
 function showMenu() {
+  content.style.display = "none"
   content.innerHTML = "";
   menu.style.display = "grid";
 }
 
 function showLobby() {
   menu.style.display = "none";
+  content.style.display = "block";
   content.innerHTML = `
     <h2>Game Lobby</h2>
     <p>Choose an option:</p>
@@ -252,6 +254,7 @@ function showLobby() {
 
 function showRules() {
   menu.style.display = "none";
+  content.style.display = "block";
   content.innerHTML = `
     <h2>Rules</h2>
     <p>3 Player Checkers rules will be defined here.</p>
@@ -261,6 +264,7 @@ function showRules() {
 
 function showSettings() {
   menu.style.display = "none";
+  content.style.display = "block";
   content.innerHTML = `
     <h2>Settings</h2>
     <p>Settings placeholder (board size, timer, etc.)</p>
@@ -281,6 +285,7 @@ function renderLobby() {
     ? `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? "s" : ""}...`
     : "Ready to begin!";
 
+  content.style.display = "block";
   content.innerHTML = `
     <h2>Game Lobby</h2>
     <div class="lobby-info">
@@ -302,6 +307,7 @@ function renderLobby() {
 
 function joinGame() {
   menu.style.display = "none";
+  content.style.display = "block";
   content.innerHTML = `
     <h2>Join Game</h2>
     <p>Enter the 4-character room code:</p>
@@ -508,6 +514,7 @@ function updateTurnDisplay() {
 }
 
 async function showGame() {
+  content.display = "block";
   content.innerHTML = `
     <h2>Game Started</h2>
     <div id="turnIndicator">
@@ -530,6 +537,7 @@ async function showGame() {
 }
 
 function showEndScreen() {
+  content.display = "block";
   content.innerHTML = `
     <h2>Game Over</h2>
     <p>Winner: Player X (placeholder)</p>

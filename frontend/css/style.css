@@ -95,6 +95,7 @@ h1{
 }
 
 #content{
+  display: none;
   width: min(900px, 95vw);
   margin-top: 18px;
   padding: 18px;
