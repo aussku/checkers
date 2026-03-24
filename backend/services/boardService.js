@@ -16,19 +16,16 @@ const STARTING_SECTORS = {
 
 const CROSS_SECTOR_EDGES = [
   // Red outer sector into neighboring sectors.
-  ["RD_3A", "BL_H4"],
   ["RD_4B", "BL_H4"],
   ["RD_4B", "BL_F4"],
   ["RD_4D", "BL_F4"],
 
   // Blue outer sector into neighboring sectors.
-  ["BD_3A", "GL_H4"],
   ["BD_4B", "GL_H4"],
   ["BD_4B", "GL_F4"],
   ["BD_4D", "GL_F4"],
 
   // Green outer sector into neighboring sectors.
-  ["GD_3A", "RL_H4"],
   ["GD_4B", "RL_H4"],
   ["GD_4B", "RL_F4"],
   ["GD_4D", "RL_F4"],
