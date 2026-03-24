@@ -501,14 +501,17 @@ function updateTurnDisplay() {
   const currentPlayerId = boardState.currentTurn;
   const currentColor = boardState.colorAssignments[currentPlayerId];
   
-  let playerNumber;
-  if (currentColor === "blue") playerNumber = 1;
-  else if (currentColor === "green") playerNumber = 2;
-  else if (currentColor === "red") playerNumber = 3;
+  if (currentPlayerId === socket.id) {
+    turnText.textContent = "Your Turn!";
+  } else {
+    let playerNumber;
+    if (currentColor === "blue") playerNumber = 1;
+    else if (currentColor === "green") playerNumber = 2;
+    else if (currentColor === "red") playerNumber = 3;
+    turnText.textContent = `Player ${playerNumber}'s Turn`;
+  }
 
-  turnText.textContent = `Player ${playerNumber}'s Turn`;
   turnText.style.color = currentColor;
-
   turnIndicator.style.borderColor = currentColor;
   turnIndicator.style.boxShadow = `0 0 20px ${currentColor}, 0 4px 12px var(--shadow)`;
 }
