@@ -1,190 +1,186 @@
 const STARTING_CELLS = {
-  dark:  ["1A", "3A", "2B", "1C", "3C", "2D"],
-  light: ["E1", "G1", "F2", "E3", "G3", "H2"],
+  outerPlayable: ["1A", "3A", "2B", "1C", "3C", "2D"],
+  innerPlayable: ["E1", "G1", "F2", "E3", "G3", "H2"],
 };
 
-const COLOR_SECTORS = {
-  blue:  { first: "dark",  second: "light" },
-  green: { first: "light", second: "dark"  },
-  red:   { first: "dark",  second: "light" },
+const PLAYABLE_CELL_PATTERNS = {
+  outer: ["1A", "1C", "2B", "2D", "3A", "3C", "4B", "4D"],
+  inner: ["E1", "E3", "F2", "F4", "G1", "G3", "H2", "H4"],
 };
+
+const STARTING_SECTORS = {
+  blue: { outer: "BD", inner: "BL" },
+  green: { outer: "GD", inner: "GL" },
+  red: { outer: "RD", inner: "RL" },
+};
+
+const CROSS_SECTOR_EDGES = [
+  // Red outer sector into neighboring sectors.
+  ["RD_3A", "BL_H4"],
+  ["RD_4B", "BL_H4"],
+  ["RD_4B", "BL_F4"],
+  ["RD_4D", "BL_F4"],
+
+  // Blue outer sector into neighboring sectors.
+  ["BD_3A", "GL_H4"],
+  ["BD_4B", "GL_H4"],
+  ["BD_4B", "GL_F4"],
+  ["BD_4D", "GL_F4"],
+
+  // Green outer sector into neighboring sectors.
+  ["GD_3A", "RL_H4"],
+  ["GD_4B", "RL_H4"],
+  ["GD_4B", "RL_F4"],
+  ["GD_4D", "RL_F4"],
+
+  // Outer-sector seam around the top center of the board.
+  ["RD_4D", "BD_4D"],
+  ["BD_4D", "GD_4D"],
+  ["GD_4D", "RD_4D"],
+];
 
 const BOARD_POSITIONS = {
-    // RED dark (rot 0°)
-  "4D_red": { x: 460.8, y: 568.0 }, "4C_red": { x: 389.3, y: 604.5 },
-  "3D_red": { x: 465.3, y: 650.0 }, "4B_red": { x: 322.8, y: 638.0 },
-  "3C_red": { x: 400.8, y: 675.3 }, "2D_red": { x: 469.0, y: 725.5 },
-  "4A_red": { x: 257.3, y: 671.0 }, "3B_red": { x: 341.8, y: 696.8 },
-  "2C_red": { x: 410.3, y: 739.8 }, "1D_red": { x: 471.8, y: 796.8 },
-  "3A_red": { x: 282.5, y: 720.0 }, "2B_red": { x: 356.8, y: 752.3 },
-  "1C_red": { x: 417.8, y: 800.5 }, "2A_red": { x: 303.8, y: 766.0 },
-  "1B_red": { x: 368.3, y: 804.3 }, "1A_red": { x: 321.3, y: 808.5 },
-  // BLUE light (rot 60°)
-  "E4_blue": { x: 421.5, y: 500.0 }, "E3_blue": { x: 354.1, y: 456.3 },
-  "F4_blue": { x: 352.7, y: 544.9 }, "E2_blue": { x: 291.9, y: 415.5 },
-  "F3_blue": { x: 298.6, y: 501.7 }, "G4_blue": { x: 289.2, y: 585.9 },
-  "E1_blue": { x: 230.5, y: 375.3 }, "F2_blue": { x: 250.5, y: 461.3 },
-  "G3_blue": { x: 247.5, y: 542.1 }, "H4_blue": { x: 228.9, y: 623.9 },
-  "F1_blue": { x: 200.7, y: 421.6 }, "G2_blue": { x: 209.9, y: 502.1 },
-  "H3_blue": { x: 198.6, y: 579.0 }, "G1_blue": { x: 171.5, y: 463.0 },
-  "H2_blue": { x: 170.6, y: 538.0 }, "H1_blue": { x: 143.5, y: 499.4 },
-  // BLUE dark (rot 120°)
-  "4D_blue": { x: 460.7, y: 432.0 }, "4C_blue": { x: 464.9, y: 351.8 },
-  "3D_blue": { x: 387.5, y: 394.9 }, "4B_blue": { x: 469.1, y: 277.5 },
-  "3C_blue": { x: 397.9, y: 326.4 }, "2D_blue": { x: 320.2, y: 360.4 },
-  "4A_blue": { x: 473.3, y: 204.3 }, "3B_blue": { x: 408.7, y: 264.6 },
-  "2C_blue": { x: 337.2, y: 302.4 }, "1D_blue": { x: 257.1, y: 327.2 },
-  "3A_blue": { x: 418.2, y: 201.6 }, "2B_blue": { x: 353.2, y: 249.8 },
-  "1C_blue": { x: 280.9, y: 278.5 }, "2A_blue": { x: 367.8, y: 197.0 },
-  "1B_blue": { x: 302.4, y: 233.8 }, "1A_blue": { x: 322.2, y: 190.9 },
-  // GREEN light (rot 180°)
-  "E4_green": { x: 539.3, y: 432.0 }, "E3_green": { x: 610.8, y: 395.5 },
-  "F4_green": { x: 534.8, y: 350.0 }, "E2_green": { x: 677.3, y: 362.0 },
-  "F3_green": { x: 599.3, y: 324.8 }, "G4_green": { x: 531.0, y: 274.5 },
-  "E1_green": { x: 742.8, y: 329.0 }, "F2_green": { x: 658.3, y: 303.3 },
-  "G3_green": { x: 589.8, y: 260.3 }, "H4_green": { x: 528.3, y: 203.3 },
-  "F1_green": { x: 717.5, y: 280.0 }, "G2_green": { x: 643.3, y: 247.8 },
-  "H3_green": { x: 582.3, y: 199.5 }, "G1_green": { x: 696.3, y: 234.0 },
-  "H2_green": { x: 631.8, y: 195.8 }, "H1_green": { x: 678.8, y: 191.5 },
-  // GREEN dark (rot 240°)
-  "4D_green": { x: 578.5, y: 500.0 }, "4C_green": { x: 645.9, y: 543.7 },
-  "3D_green": { x: 647.3, y: 455.1 }, "4B_green": { x: 708.1, y: 584.5 },
-  "3C_green": { x: 701.4, y: 498.3 }, "2D_green": { x: 710.8, y: 414.1 },
-  "4A_green": { x: 769.5, y: 624.7 }, "3B_green": { x: 749.5, y: 538.7 },
-  "2C_green": { x: 752.5, y: 457.9 }, "1D_green": { x: 771.1, y: 376.1 },
-  "3A_green": { x: 799.3, y: 578.4 }, "2B_green": { x: 790.1, y: 497.9 },
-  "1C_green": { x: 801.4, y: 421.0 }, "2A_green": { x: 828.5, y: 537.0 },
-  "1B_green": { x: 829.4, y: 462.0 }, "1A_green": { x: 856.5, y: 500.6 },
-  // RED light (rot 300°)
-  "E4_red": { x: 539.3, y: 568.0 }, "E3_red": { x: 535.1, y: 648.2 },
-  "F4_red": { x: 612.5, y: 605.1 }, "E2_red": { x: 530.9, y: 722.5 },
-  "F3_red": { x: 602.1, y: 673.6 }, "G4_red": { x: 679.8, y: 639.6 },
-  "E1_red": { x: 526.7, y: 795.7 }, "F2_red": { x: 591.3, y: 735.4 },
-  "G3_red": { x: 662.8, y: 697.6 }, "H4_red": { x: 742.9, y: 672.8 },
-  "F1_red": { x: 581.8, y: 798.4 }, "G2_red": { x: 646.8, y: 750.2 },
-  "H3_red": { x: 719.1, y: 721.5 }, "G1_red": { x: 632.2, y: 803.0 },
-  "H2_red": { x: 697.6, y: 766.2 }, "H1_red": { x: 677.8, y: 809.1 },
+  // RED outer sector
+  "RD_4D": { x: 460.8, y: 568.0 }, "RD_4C": { x: 389.3, y: 604.5 },
+  "RD_3D": { x: 465.3, y: 650.0 }, "RD_4B": { x: 322.8, y: 638.0 },
+  "RD_3C": { x: 400.8, y: 675.3 }, "RD_2D": { x: 469.0, y: 725.5 },
+  "RD_4A": { x: 257.3, y: 671.0 }, "RD_3B": { x: 341.8, y: 696.8 },
+  "RD_2C": { x: 410.3, y: 739.8 }, "RD_1D": { x: 471.8, y: 796.8 },
+  "RD_3A": { x: 282.5, y: 720.0 }, "RD_2B": { x: 356.8, y: 752.3 },
+  "RD_1C": { x: 417.8, y: 800.5 }, "RD_2A": { x: 303.8, y: 766.0 },
+  "RD_1B": { x: 368.3, y: 804.3 }, "RD_1A": { x: 321.3, y: 808.5 },
+
+  // BLUE inner sector
+  "BL_E4": { x: 421.5, y: 500.0 }, "BL_E3": { x: 354.1, y: 456.3 },
+  "BL_F4": { x: 352.7, y: 544.9 }, "BL_E2": { x: 291.9, y: 415.5 },
+  "BL_F3": { x: 298.6, y: 501.7 }, "BL_G4": { x: 289.2, y: 585.9 },
+  "BL_E1": { x: 230.5, y: 375.3 }, "BL_F2": { x: 250.5, y: 461.3 },
+  "BL_G3": { x: 247.5, y: 542.1 }, "BL_H4": { x: 228.9, y: 623.9 },
+  "BL_F1": { x: 200.7, y: 421.6 }, "BL_G2": { x: 209.9, y: 502.1 },
+  "BL_H3": { x: 198.6, y: 579.0 }, "BL_G1": { x: 171.5, y: 463.0 },
+  "BL_H2": { x: 170.6, y: 538.0 }, "BL_H1": { x: 143.5, y: 499.4 },
+
+   // BLUE outer sector
+  "BD_4D": { x: 460.7, y: 432.0 }, "BD_4C": { x: 464.9, y: 351.8 },
+  "BD_3D": { x: 387.5, y: 394.9 }, "BD_4B": { x: 469.1, y: 277.5 },
+  "BD_3C": { x: 397.9, y: 326.4 }, "BD_2D": { x: 320.2, y: 360.4 },
+  "BD_4A": { x: 473.3, y: 204.3 }, "BD_3B": { x: 408.7, y: 264.6 },
+  "BD_2C": { x: 337.2, y: 302.4 }, "BD_1D": { x: 257.1, y: 327.2 },
+  "BD_3A": { x: 418.2, y: 201.6 }, "BD_2B": { x: 353.2, y: 249.8 },
+  "BD_1C": { x: 280.9, y: 278.5 }, "BD_2A": { x: 367.8, y: 197.0 },
+  "BD_1B": { x: 302.4, y: 233.8 }, "BD_1A": { x: 322.2, y: 190.9 },
+
+  // GREEN inner sector
+  "GL_E4": { x: 539.3, y: 432.0 }, "GL_E3": { x: 610.8, y: 395.5 },
+  "GL_F4": { x: 534.8, y: 350.0 }, "GL_E2": { x: 677.3, y: 362.0 },
+  "GL_F3": { x: 599.3, y: 324.8 }, "GL_G4": { x: 531.0, y: 274.5 },
+  "GL_E1": { x: 742.8, y: 329.0 }, "GL_F2": { x: 658.3, y: 303.3 },
+  "GL_G3": { x: 589.8, y: 260.3 }, "GL_H4": { x: 528.3, y: 203.3 },
+  "GL_F1": { x: 717.5, y: 280.0 }, "GL_G2": { x: 643.3, y: 247.8 },
+  "GL_H3": { x: 582.3, y: 199.5 }, "GL_G1": { x: 696.3, y: 234.0 },
+  "GL_H2": { x: 631.8, y: 195.8 }, "GL_H1": { x: 678.8, y: 191.5 },
+
+  // GREEN outer sector
+  "GD_4D": { x: 578.5, y: 500.0 }, "GD_4C": { x: 645.9, y: 543.7 },
+  "GD_3D": { x: 647.3, y: 455.1 }, "GD_4B": { x: 708.1, y: 584.5 },
+  "GD_3C": { x: 701.4, y: 498.3 }, "GD_2D": { x: 710.8, y: 414.1 },
+  "GD_4A": { x: 769.5, y: 624.7 }, "GD_3B": { x: 749.5, y: 538.7 },
+  "GD_2C": { x: 752.5, y: 457.9 }, "GD_1D": { x: 771.1, y: 376.1 },
+  "GD_3A": { x: 799.3, y: 578.4 }, "GD_2B": { x: 790.1, y: 497.9 },
+  "GD_1C": { x: 801.4, y: 421.0 }, "GD_2A": { x: 828.5, y: 537.0 },
+  "GD_1B": { x: 829.4, y: 462.0 }, "GD_1A": { x: 856.5, y: 500.6 },
+
+  // RED inner sector
+  "RL_E4": { x: 539.3, y: 568.0 }, "RL_E3": { x: 535.1, y: 648.2 },
+  "RL_F4": { x: 612.5, y: 605.1 }, "RL_E2": { x: 530.9, y: 722.5 },
+  "RL_F3": { x: 602.1, y: 673.6 }, "RL_G4": { x: 679.8, y: 639.6 },
+  "RL_E1": { x: 526.7, y: 795.7 }, "RL_F2": { x: 591.3, y: 735.4 },
+  "RL_G3": { x: 662.8, y: 697.6 }, "RL_H4": { x: 742.9, y: 672.8 },
+  "RL_F1": { x: 581.8, y: 798.4 }, "RL_G2": { x: 646.8, y: 750.2 },
+  "RL_H3": { x: 719.1, y: 721.5 }, "RL_G1": { x: 632.2, y: 803.0 },
+  "RL_H2": { x: 697.6, y: 766.2 }, "RL_H1": { x: 677.8, y: 809.1 },
 };
 
-const NORMAL_MOVE_MAP = {
-  // BLUE
-  "1A_blue": ["2B_blue"],
-  "1B_blue": ["2A_blue", "2C_blue"],
-  "1C_blue": ["2B_blue", "2D_blue"],
-  "1D_blue": ["2C_blue"],
+const PLAYABLE_CELLS = new Set();
 
-  "2A_blue": ["3B_blue"],
-  "2B_blue": ["3A_blue", "3C_blue"],
-  "2C_blue": ["3B_blue", "3D_blue"],
-  "2D_blue": ["3C_blue"],
+function createSimpleDiagonalGraph() {
+  const graph = {};
 
-  "3A_blue": ["4B_blue"],
-  "3B_blue": ["4A_blue", "4C_blue"],
-  "3C_blue": ["4B_blue", "4D_blue"],
-  "3D_blue": ["4C_blue"],
+  function addNode(position) {
+    if (!graph[position]) {
+      graph[position] = new Set();
+    }
+  }
 
-  "E1_blue": ["F2_blue"],
-  "F1_blue": ["E2_blue", "G2_blue"],
-  "G1_blue": ["F2_blue", "H2_blue"],
-  "H1_blue": ["G2_blue"],
+  function addEdge(from, to) {
+    addNode(from);
+    addNode(to);
+    graph[from].add(to);
+    graph[to].add(from);
+  }
 
-  "E2_blue": ["F3_blue"],
-  "F2_blue": ["E3_blue", "G3_blue"],
-  "G2_blue": ["F3_blue", "H3_blue"],
-  "H2_blue": ["G3_blue"],
+  for (const { outer, inner } of Object.values(STARTING_SECTORS)) {
+    const outerPlayable = PLAYABLE_CELL_PATTERNS.outer.map(cell => `${outer}_${cell}`);
+    const innerPlayable = PLAYABLE_CELL_PATTERNS.inner.map(cell => `${inner}_${cell}`);
 
-  "E3_blue": ["F4_blue", "D4_blue"],
-  "F3_blue": ["E4_blue", "G4_blue"],
-  "G3_blue": ["F4_blue", "H4_blue"],
-  "H3_blue": ["G4_blue"],
+    [...outerPlayable, ...innerPlayable].forEach(position => {
+      PLAYABLE_CELLS.add(position);
+      addNode(position);
+    });
 
-  "E4_blue": [],
-  "F4_blue": [],
-  "G4_blue": [],
-  "H4_blue": [],
+    // Outer sector diagonals.
+    addEdge(`${outer}_1A`, `${outer}_2B`);
+    addEdge(`${outer}_1C`, `${outer}_2B`);
+    addEdge(`${outer}_1C`, `${outer}_2D`);
+    addEdge(`${outer}_2B`, `${outer}_3A`);
+    addEdge(`${outer}_2B`, `${outer}_3C`);
+    addEdge(`${outer}_2D`, `${outer}_3C`);
+    addEdge(`${outer}_3A`, `${outer}_4B`);
+    addEdge(`${outer}_3C`, `${outer}_4B`);
+    addEdge(`${outer}_3C`, `${outer}_4D`);
 
-  // GREEN
-  "1A_green": ["2B_green"],
-  "1B_green": ["2A_green", "2C_green"],
-  "1C_green": ["2B_green", "2D_green"],
-  "1D_green": ["2C_green"],
+    // Outer-to-inner diagonals within the same player sector.
+    addEdge(`${outer}_1C`, `${inner}_E1`);
+    addEdge(`${outer}_2D`, `${inner}_E1`);
+    addEdge(`${outer}_2D`, `${inner}_E3`);
+    addEdge(`${outer}_4D`, `${inner}_E3`);
 
-  "2A_green": ["3B_green"],
-  "2B_green": ["3A_green", "3C_green"],
-  "2C_green": ["3B_green", "3D_green"],
-  "2D_green": ["3C_green"],
+    // Inner sector diagonals.
+    addEdge(`${inner}_E1`, `${inner}_F2`);
+    addEdge(`${inner}_E3`, `${inner}_F2`);
+    addEdge(`${inner}_E3`, `${inner}_F4`);
+    addEdge(`${inner}_F2`, `${inner}_G1`);
+    addEdge(`${inner}_F2`, `${inner}_G3`);
+    addEdge(`${inner}_F4`, `${inner}_G3`);
+    addEdge(`${inner}_G1`, `${inner}_H2`);
+    addEdge(`${inner}_G3`, `${inner}_H2`);
+    addEdge(`${inner}_G3`, `${inner}_H4`);
 
-  "3A_green": ["4B_green"],
-  "3B_green": ["4A_green", "4C_green"],
-  "3C_green": ["4B_green", "4D_green"],
-  "3D_green": ["4C_green"],
+  }
 
-  "E1_green": ["F2_green"],
-  "F1_green": ["E2_green", "G2_green"],
-  "G1_green": ["F2_green", "H2_green"],
-  "H1_green": ["G2_green"],
+  CROSS_SECTOR_EDGES.forEach(([from, to]) => addEdge(from, to));
 
-  "E2_green": ["F3_green"],
-  "F2_green": ["E3_green", "G3_green"],
-  "G2_green": ["F3_green", "H3_green"],
-  "H2_green": ["G3_green"],
+  return Object.fromEntries(
+    Object.entries(graph).map(([position, neighbors]) => [
+      position,
+      [...neighbors].sort(),
+    ])
+  );
+}
 
-  "E3_green": ["F4_green", "D4_green"],
-  "F3_green": ["E4_green", "G4_green"],
-  "G3_green": ["F4_green", "H4_green"],
-  "H3_green": ["G4_green"],
-
-  "E4_green": [],
-  "F4_green": [],
-  "G4_green": [],
-  "H4_green": [],
-
-  // RED
-  "1A_red": ["2B_red"],
-  "1B_red": ["2A_red", "2C_red"],
-  "1C_red": ["2B_red", "2D_red"],
-  "1D_red": ["2C_red"],
-
-  "2A_red": ["3B_red"],
-  "2B_red": ["3A_red", "3C_red"],
-  "2C_red": ["3B_red", "3D_red"],
-  "2D_red": ["3C_red"],
-
-  "3A_red": ["4B_red"],
-  "3B_red": ["4A_red", "4C_red"],
-  "3C_red": ["4B_red", "4D_red"],
-  "3D_red": ["4C_red"],
-
-  "E1_red": ["F2_red"],
-  "F1_red": ["E2_red", "G2_red"],
-  "G1_red": ["F2_red", "H2_red"],
-  "H1_red": ["G2_red"],
-
-  "E2_red": ["F3_red"],
-  "F2_red": ["E3_red", "G3_red"],
-  "G2_red": ["F3_red", "H3_red"],
-  "H2_red": ["G3_red"],
-
-  "E3_red": ["F4_red", "D4_red"],
-  "F3_red": ["E4_red", "G4_red"],
-  "G3_red": ["F4_red", "H4_red"],
-  "H3_red": ["G4_red"],
-
-  "E4_red": [],
-  "F4_red": [],
-  "G4_red": [],
-  "H4_red": [],
-};
+const SIMPLE_DIAGONAL_GRAPH = createSimpleDiagonalGraph();
 
 function createInitialPieces() {
   const pieces = [];
 
-  for (const [color, sectors] of Object.entries(COLOR_SECTORS)) {
-    const prefix = color[0]; // "b", "g", "r"
-    const firstCells  = STARTING_CELLS[sectors.first].map(c => `${c}_${color}`);
-    const secondCells = STARTING_CELLS[sectors.second].map(c => `${c}_${color}`);
+  for (const [color, sectors] of Object.entries(STARTING_SECTORS)) {
+    const prefix = color[0];
+    const positions = [
+      ...STARTING_CELLS.outerPlayable.map(c => `${sectors.outer}_${c}`),
+      ...STARTING_CELLS.innerPlayable.map(c => `${sectors.inner}_${c}`),
+    ];
 
-    [...firstCells, ...secondCells].forEach((position, i) => {
+    positions.forEach((position, i) => {
       pieces.push({ id: `${prefix}${i + 1}`, color, position, king: false });
     });
   }
@@ -231,8 +227,9 @@ function advanceTurn(gameState) {
   gameState.currentTurn = turnOrder[nextIndex];
 }
 
-function getValidSimpleMovesForNormalPiece(piece) {
-  return NORMAL_MOVE_MAP[piece.position] || [];
+function getValidSimpleMovesForNormalPiece(gameState, piece) {
+  const neighbors = SIMPLE_DIAGONAL_GRAPH[piece.position] || [];
+  return neighbors.filter(position => !getPieceAtPosition(gameState, position));
 }
 
 function validateMove(gameState, piece, to) {
@@ -248,9 +245,8 @@ function validateMove(gameState, piece, to) {
     return { ok: false, error: "Target cell is outside the board" };
   }
 
-  // pieces stay in their own color coordinate space
-  if (!to.endsWith(`_${piece.color}`)) {
-    return { ok: false, error: "Target cell is outside this piece's board" };
+  if (!PLAYABLE_CELLS.has(to)) {
+    return { ok: false, error: "Target cell is not a playable diagonal square" };
   }
 
   const occupyingPiece = getPieceAtPosition(gameState, to);
@@ -263,7 +259,7 @@ function validateMove(gameState, piece, to) {
     return { ok: false, error: "King movement is not implemented yet" };
   }
 
-  const validMoves = getValidSimpleMovesForNormalPiece(piece);
+  const validMoves = getValidSimpleMovesForNormalPiece(gameState, piece);
   console.log("Valid moves for", piece.id, piece.position, "=>", validMoves);
   if (!validMoves.includes(to)) {
     return { ok: false, error: "Invalid move for a normal piece" };
