@@ -39,6 +39,24 @@ const CROSS_SECTOR_EDGES = [
   ["RD_4D", "BD_4D"], ["BD_4D", "GD_4D"], ["GD_4D", "RD_4D"],
 ];
 
+const PROMOTION_ZONES = {
+  // Blue promotes on the far Row 1 edges of Green and Red
+  blue: [
+    "GD_1A", "GD_1C", "GL_E1", "GL_G1", 
+    "RD_1A", "RD_1C", "RL_E1", "RL_G1"
+  ],
+  // Green promotes on the far Row 1 edges of Blue and Red
+  green: [
+    "BD_1A", "BD_1C", "BL_E1", "BL_G1", 
+    "RD_1A", "RD_1C", "RL_E1", "RL_G1"
+  ],
+  // Red promotes on the far Row 1 edges of Blue and Green
+  red: [
+    "BD_1A", "BD_1C", "BL_E1", "BL_G1", 
+    "GD_1A", "GD_1C", "GL_E1", "GL_G1"
+  ]
+};
+
 // ---------------------------------------------------------------------------
 // Movement graph (one-step diagonal moves)
 // ---------------------------------------------------------------------------
@@ -409,69 +427,65 @@ function initializeGameState(players) {
 // ---------------------------------------------------------------------------
 
 function applyMove(gameState, playerId, pieceId, to) {
-  if (!gameState)                         return { ok: false, error: "Game state missing" };
-  if (gameState.status !== "active")      return { ok: false, error: "Game is not active" };
-  if (gameState.currentTurn !== playerId) return { ok: false, error: "It is not your turn" };
+  if (!gameState || gameState.status !== "active") return { ok: false, error: "Game not active" };
+  if (gameState.currentTurn !== playerId) return { ok: false, error: "Not your turn" };
 
   const piece = getPieceById(gameState, pieceId);
-  if (!piece) return { ok: false, error: "Piece not found" };
-
   const playerColor = getPlayerColor(gameState, playerId);
-  if (!playerColor)                return { ok: false, error: "Player color not found" };
-  if (piece.color !== playerColor) return { ok: false, error: "You can only move your own pieces" };
+  if (!piece || piece.color !== playerColor) return { ok: false, error: "Invalid piece" };
 
+  // Enforce multi-jump continuity
   if (gameState.captureChain && gameState.captureChain.pieceId !== pieceId) {
-    return { ok: false, error: "You must continue capturing with the same piece" };
+    return { ok: false, error: "Must continue jump with the same piece" };
   }
 
-  if (!PLAYABLE_CELLS.has(to)) {
-    return { ok: false, error: "Target cell is not a playable square" };
+  if (!PLAYABLE_CELLS.has(to) || getPieceAtPosition(gameState, to)) {
+    return { ok: false, error: "Target cell invalid or occupied" };
   }
 
-  if (getPieceAtPosition(gameState, to)) {
-    return { ok: false, error: "Destination is occupied" };
-  }
+  const from = piece.position;
+  let capturedCell = null;
+  let promoted = false;
 
-  // Check for capture move first
+  // 1. Process Jump
   const captureMove = getCaptureMoves(gameState, piece).find(j => j.to === to);
-
   if (captureMove) {
-    const from = piece.position;
     const capturedPiece = getPieceAtPosition(gameState, captureMove.over);
-
     gameState.pieces = gameState.pieces.filter(p => p.id !== capturedPiece.id);
     piece.position = to;
+    capturedCell = captureMove.over;
 
-    const furtherCaptures = getCaptureMoves(gameState, piece);
-    if (furtherCaptures.length > 0) {
+    // Promotion check (Ends turn immediately if promoted)
+    if (!piece.king && PROMOTION_ZONES[playerColor].includes(to)) {
+      piece.king = true;
+      promoted = true;
+    }
+
+    const further = getCaptureMoves(gameState, piece);
+    if (further.length > 0 && !promoted) {
       gameState.captureChain = { pieceId: piece.id };
     } else {
       gameState.captureChain = null;
       advanceTurn(gameState);
     }
-
-    return { ok: true, move: { pieceId, from, to, captured: captureMove.over } };
+    return { ok: true, move: { pieceId, from, to, captured: capturedCell, promoted } };
   }
 
-  // Simple move
-  if (gameState.captureChain) {
-    return { ok: false, error: "You must capture — a jump is available" };
+  // 2. Process Simple Move
+  if (gameState.captureChain || hasAnyCapture(gameState, playerColor)) {
+    return { ok: false, error: "Mandatory capture rule: you must jump" };
   }
 
-  if (hasAnyCapture(gameState, playerColor)) {
-    return { ok: false, error: "You must capture — a jump is available" };
-  }
+  if (!getSimpleMoves(gameState, piece).includes(to)) return { ok: false, error: "Invalid move" };
 
-  const simpleMoves = getSimpleMoves(gameState, piece);
-  if (!simpleMoves.includes(to)) {
-    return { ok: false, error: "Invalid move" };
-  }
-
-  const from = piece.position;
   piece.position = to;
+  if (!piece.king && PROMOTION_ZONES[playerColor].includes(to)) {
+    piece.king = true;
+    promoted = true;
+  }
+  
   advanceTurn(gameState);
-
-  return { ok: true, move: { pieceId, from, to, captured: null } };
+  return { ok: true, move: { pieceId, from, to, captured: null, promoted } };
 }
 
 module.exports = {
