@@ -113,240 +113,206 @@ const MOVEMENT_GRAPH = buildMovementGraph();
 // JUMP_GRAPH[from] = [{ over, to }, ...]
 // 138 jump pairs across 48 cells
 const JUMP_GRAPH = {
-  "BD_1A": [
-    { over: "BD_2B", to: "BD_3C" },
-  ],
+  // --- BLUE SECTOR ---
+  "BD_1A": [{ over: "BD_2B", to: "BD_3C" }],
   "BD_1C": [
     { over: "BD_2B", to: "BD_3A" },
-    { over: "BD_2D", to: "BL_E3" },
-    { over: "BL_E1", to: "BL_F2" },
+    { over: "BD_2D", to: "BL_E3" }
   ],
   "BD_2B": [
-    { over: "BD_1C", to: "BL_E1" },
     { over: "BD_3C", to: "BD_4D" },
+    { over: "BD_1C", to: "BL_E1" }
   ],
   "BD_2D": [
     { over: "BD_3C", to: "BD_4B" },
-    { over: "BL_E3", to: "BL_F4" },
+    { over: "BL_E3", to: "BL_F4" }
   ],
   "BD_3A": [
     { over: "BD_2B", to: "BD_1C" },
-    { over: "BD_4B", to: "GL_F4" },
+    { over: "BD_4B", to: "GL_F4" }
   ],
   "BD_3C": [
     { over: "BD_2B", to: "BD_1A" },
     { over: "BD_2D", to: "BL_E1" },
     { over: "BD_4B", to: "GL_H4" },
     { over: "BD_4D", to: "GD_4D" },
-    { over: "BD_4D", to: "RD_4D" },
+    { over: "BD_4D", to: "RD_4D" }
   ],
   "BD_4B": [
     { over: "BD_3C", to: "BD_2D" },
-    { over: "GL_F4", to: "GL_E3" },
+    { over: "GL_F4", to: "GL_E3" }
   ],
   "BD_4D": [
     { over: "BD_3C", to: "BD_2B" },
     { over: "BL_E3", to: "BL_F2" },
-    { over: "GD_4D", to: "GD_3C" },
-    { over: "GD_4D", to: "RL_F4" },
     { over: "GL_F4", to: "GL_G3" },
     { over: "RD_4D", to: "RD_3C" },
-    { over: "RD_4D", to: "RL_E3" },
+    { over: "GD_4D", to: "GD_3C" }
   ],
   "BL_E1": [
-    { over: "BD_1C", to: "BD_2B" },
     { over: "BD_2D", to: "BD_3C" },
-    { over: "BL_F2", to: "BL_G3" },
+    { over: "BL_F2", to: "BL_G3" }
   ],
   "BL_E3": [
     { over: "BD_2D", to: "BD_1C" },
-    { over: "BD_4D", to: "GD_4D" },
-    { over: "BD_4D", to: "GL_F4" },
     { over: "BL_F2", to: "BL_G1" },
     { over: "BL_F4", to: "RD_4B" },
+    { over: "BD_4D", to: "GL_F4" } 
   ],
   "BL_F2": [
-    { over: "BL_E1", to: "BD_1C" },
     { over: "BL_E3", to: "BD_4D" },
-    { over: "BL_G3", to: "BL_H4" },
+    { over: "BL_G3", to: "BL_H4" }
   ],
   "BL_F4": [
     { over: "BL_E3", to: "BD_2D" },
     { over: "BL_G3", to: "BL_H2" },
     { over: "RD_4B", to: "RD_3A" },
-    { over: "RD_4D", to: "GD_4D" },
-    { over: "RD_4D", to: "RL_E3" },
+    { over: "RD_4D", to: "RL_E3" } 
   ],
-  "BL_G1": [
-    { over: "BL_F2", to: "BL_E3" },
-  ],
+  "BL_G1": [{ over: "BL_F2", to: "BL_E3" }],
   "BL_G3": [
     { over: "BL_F2", to: "BL_E1" },
-    { over: "BL_F4", to: "RD_4D" },
+    { over: "BL_F4", to: "RD_4D" }
   ],
-  "BL_H2": [
-    { over: "BL_G3", to: "BL_F4" },
-  ],
+  "BL_H2": [{ over: "BL_G3", to: "BL_F4" }],
   "BL_H4": [
     { over: "BL_G3", to: "BL_F2" },
-    { over: "RD_4B", to: "RD_3C" },
+    { over: "RD_4B", to: "RD_3C" }
   ],
-  "GD_1A": [
-    { over: "GD_2B", to: "GD_3C" },
-  ],
+
+  // --- GREEN SECTOR ---
+  "GD_1A": [{ over: "GD_2B", to: "GD_3C" }],
   "GD_1C": [
     { over: "GD_2B", to: "GD_3A" },
-    { over: "GD_2D", to: "GL_E3" },
-    { over: "GL_E1", to: "GL_F2" },
+    { over: "GD_2D", to: "GL_E3" }
   ],
   "GD_2B": [
-    { over: "GD_1C", to: "GL_E1" },
     { over: "GD_3C", to: "GD_4D" },
+    { over: "GD_1C", to: "GL_E1" }
   ],
   "GD_2D": [
     { over: "GD_3C", to: "GD_4B" },
-    { over: "GL_E3", to: "GL_F4" },
+    { over: "GL_E3", to: "GL_F4" }
   ],
   "GD_3A": [
     { over: "GD_2B", to: "GD_1C" },
-    { over: "GD_4B", to: "RL_F4" },
+    { over: "GD_4B", to: "RL_F4" }
   ],
   "GD_3C": [
     { over: "GD_2B", to: "GD_1A" },
     { over: "GD_2D", to: "GL_E1" },
     { over: "GD_4B", to: "RL_H4" },
     { over: "GD_4D", to: "BD_4D" },
-    { over: "GD_4D", to: "RD_4D" },
+    { over: "GD_4D", to: "RD_4D" }
   ],
   "GD_4B": [
     { over: "GD_3C", to: "GD_2D" },
-    { over: "RL_F4", to: "RL_E3" },
+    { over: "RL_F4", to: "RL_E3" }
   ],
   "GD_4D": [
-    { over: "BD_4D", to: "BD_3C" },
-    { over: "BD_4D", to: "BL_E3" },
     { over: "GD_3C", to: "GD_2B" },
     { over: "GL_E3", to: "GL_F2" },
-    { over: "RD_4D", to: "BL_F4" },
-    { over: "RD_4D", to: "RD_3C" },
     { over: "RL_F4", to: "RL_G3" },
+    { over: "BD_4D", to: "BD_3C" },
+    { over: "RD_4D", to: "RD_3C" }
   ],
   "GL_E1": [
-    { over: "GD_1C", to: "GD_2B" },
     { over: "GD_2D", to: "GD_3C" },
-    { over: "GL_F2", to: "GL_G3" },
+    { over: "GL_F2", to: "GL_G3" }
   ],
   "GL_E3": [
     { over: "GD_2D", to: "GD_1C" },
-    { over: "GD_4D", to: "RD_4D" },
-    { over: "GD_4D", to: "RL_F4" },
     { over: "GL_F2", to: "GL_G1" },
     { over: "GL_F4", to: "BD_4B" },
+    { over: "GD_4D", to: "RL_F4" } 
   ],
   "GL_F2": [
-    { over: "GL_E1", to: "GD_1C" },
     { over: "GL_E3", to: "GD_4D" },
-    { over: "GL_G3", to: "GL_H4" },
+    { over: "GL_G3", to: "GL_H4" }
   ],
   "GL_F4": [
-    { over: "BD_4B", to: "BD_3A" },
-    { over: "BD_4D", to: "BL_E3" },
-    { over: "BD_4D", to: "RD_4D" },
     { over: "GL_E3", to: "GD_2D" },
     { over: "GL_G3", to: "GL_H2" },
+    { over: "BD_4B", to: "BD_3A" },
+    { over: "BD_4D", to: "BL_E3" }
   ],
-  "GL_G1": [
-    { over: "GL_F2", to: "GL_E3" },
-  ],
+  "GL_G1": [{ over: "GL_F2", to: "GL_E3" }],
   "GL_G3": [
     { over: "GL_F2", to: "GL_E1" },
-    { over: "GL_F4", to: "BD_4D" },
+    { over: "GL_F4", to: "BD_4D" }
   ],
-  "GL_H2": [
-    { over: "GL_G3", to: "GL_F4" },
-  ],
+  "GL_H2": [{ over: "GL_G3", to: "GL_F4" }],
   "GL_H4": [
-    { over: "BD_4B", to: "BD_3C" },
     { over: "GL_G3", to: "GL_F2" },
+    { over: "BD_4B", to: "BD_3C" }
   ],
-  "RD_1A": [
-    { over: "RD_2B", to: "RD_3C" },
-  ],
+
+  // --- RED SECTOR ---
+  "RD_1A": [{ over: "RD_2B", to: "RD_3C" }],
   "RD_1C": [
     { over: "RD_2B", to: "RD_3A" },
-    { over: "RD_2D", to: "RL_E3" },
-    { over: "RL_E1", to: "RL_F2" },
+    { over: "RD_2D", to: "RL_E3" }
   ],
   "RD_2B": [
-    { over: "RD_1C", to: "RL_E1" },
     { over: "RD_3C", to: "RD_4D" },
+    { over: "RD_1C", to: "RL_E1" }
   ],
   "RD_2D": [
     { over: "RD_3C", to: "RD_4B" },
-    { over: "RL_E3", to: "RL_F4" },
+    { over: "RL_E3", to: "RL_F4" }
   ],
   "RD_3A": [
     { over: "RD_2B", to: "RD_1C" },
-    { over: "RD_4B", to: "BL_F4" },
+    { over: "RD_4B", to: "BL_F4" }
   ],
   "RD_3C": [
     { over: "RD_2B", to: "RD_1A" },
     { over: "RD_2D", to: "RL_E1" },
     { over: "RD_4B", to: "BL_H4" },
     { over: "RD_4D", to: "BD_4D" },
-    { over: "RD_4D", to: "GD_4D" },
+    { over: "RD_4D", to: "GD_4D" }
   ],
   "RD_4B": [
-    { over: "BL_F4", to: "BL_E3" },
     { over: "RD_3C", to: "RD_2D" },
+    { over: "BL_F4", to: "BL_E3" }
   ],
   "RD_4D": [
-    { over: "BD_4D", to: "BD_3C" },
-    { over: "BD_4D", to: "GL_F4" },
-    { over: "BL_F4", to: "BL_G3" },
-    { over: "GD_4D", to: "GD_3C" },
-    { over: "GD_4D", to: "GL_E3" },
     { over: "RD_3C", to: "RD_2B" },
     { over: "RL_E3", to: "RL_F2" },
+    { over: "BL_F4", to: "BL_G3" },
+    { over: "BD_4D", to: "BD_3C" },
+    { over: "GD_4D", to: "GD_3C" }
   ],
   "RL_E1": [
-    { over: "RD_1C", to: "RD_2B" },
     { over: "RD_2D", to: "RD_3C" },
-    { over: "RL_F2", to: "RL_G3" },
+    { over: "RL_F2", to: "RL_G3" }
   ],
   "RL_E3": [
     { over: "RD_2D", to: "RD_1C" },
-    { over: "RD_4D", to: "BD_4D" },
-    { over: "RD_4D", to: "BL_F4" },
     { over: "RL_F2", to: "RL_G1" },
     { over: "RL_F4", to: "GD_4B" },
+    { over: "RD_4D", to: "BL_F4" }
   ],
   "RL_F2": [
-    { over: "RL_E1", to: "RD_1C" },
     { over: "RL_E3", to: "RD_4D" },
-    { over: "RL_G3", to: "RL_H4" },
+    { over: "RL_G3", to: "RL_H4" }
   ],
   "RL_F4": [
-    { over: "GD_4B", to: "GD_3A" },
-    { over: "GD_4D", to: "BD_4D" },
-    { over: "GD_4D", to: "GL_E3" },
     { over: "RL_E3", to: "RD_2D" },
     { over: "RL_G3", to: "RL_H2" },
+    { over: "GD_4B", to: "GD_3A" },
+    { over: "GD_4D", to: "GL_E3" } 
   ],
-  "RL_G1": [
-    { over: "RL_F2", to: "RL_E3" },
-  ],
+  "RL_G1": [{ over: "RL_F2", to: "RL_E3" }],
   "RL_G3": [
     { over: "RL_F2", to: "RL_E1" },
-    { over: "RL_F4", to: "GD_4D" },
+    { over: "RL_F4", to: "GD_4D" }
   ],
-  "RL_H2": [
-    { over: "RL_G3", to: "RL_F4" },
-  ],
+  "RL_H2": [{ over: "RL_G3", to: "RL_F4" }],
   "RL_H4": [
-    { over: "GD_4B", to: "GD_3C" },
     { over: "RL_G3", to: "RL_F2" },
-  ],
+    { over: "GD_4B", to: "GD_3C" }
+  ]
 };
 
 // ---------------------------------------------------------------------------
