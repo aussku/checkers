@@ -681,6 +681,9 @@ module.exports = {
   PLAYABLE_CELLS,
   MOVEMENT_GRAPH,
   JUMP_GRAPH,
+  PROMOTION_ZONES,
+  isForwardMove,
+  buildForwardDistances,
   createInitialPieces,
   initializeGameState,
   getPieceById,
@@ -689,4 +692,6 @@ module.exports = {
   getSimpleMoves,
   getCaptureMoves,
   applyMove,
+  getNeighbors,
+  getLine
 };
