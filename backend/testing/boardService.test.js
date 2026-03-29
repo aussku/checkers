@@ -31,6 +31,7 @@ describe("boardService", () => {
         from: "BD_3A",
         to: "BD_4B",
         captured: null,
+        promoted: false, 
       },
     });
     expect(gameState.pieces.find(piece => piece.id === "b2").position).toBe("BD_4B");
@@ -44,7 +45,7 @@ describe("boardService", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      error: "You can only move your own pieces",
+      error: "Invalid piece or piece does not belong to you",
     });
     expect(gameState.pieces.find(piece => piece.id === "g1").position).toBe("GD_1A");
     expect(gameState.currentTurn).toBe("player-1");
@@ -100,6 +101,7 @@ describe("boardService", () => {
         from: "BD_1A",
         to: "BD_3C",
         captured: "BD_2B",
+        promoted: false,
       },
     });
     expect(gameState.pieces.find(piece => piece.id === "b1").position).toBe("BD_3C");
@@ -130,7 +132,7 @@ describe("boardService", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      error: "You must capture — a jump is available",
+      error: "Mandatory capture rule: You must perform a jump.",
     });
     expect(gameState.pieces.find(piece => piece.id === "b2").position).toBe("BD_3A");
     expect(gameState.currentTurn).toBe("player-1");
@@ -191,7 +193,7 @@ describe("boardService", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      error: "You must continue capturing with the same piece",
+      error: "Must continue jump sequence with the same piece",
     });
   });
 });
