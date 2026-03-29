@@ -109,3 +109,38 @@ describe("roomService", () => {
     }).toThrow("Room not found");
   });
 });
+
+describe("Room Service Integration (Bot Flow)", () => {
+  
+  beforeEach(() => {
+    rooms.clear();
+    jest.restoreAllMocks();
+  });
+
+  test("should complete a full 3-player game start sequence (Bot Scenario)", () => {
+    jest.spyOn(global.Math, 'random').mockReturnValue(0);
+
+    const room = createRoom("bot-host");
+    const roomCode = room.code; 
+    
+    expect(roomCode).toBe("AAAA");
+
+    joinRoom(roomCode, "bot-2");
+    
+    joinRoom(roomCode, "bot-3");
+
+    const currentRoom = rooms.get(roomCode);
+    expect(currentRoom.players).toHaveLength(3);
+
+    const step1 = toggleReady(roomCode, "bot-host");
+    expect(step1.allReady).toBe(false);
+
+    const step2 = toggleReady(roomCode, "bot-2");
+    expect(step2.allReady).toBe(false);
+
+    const finalStep = toggleReady(roomCode, "bot-3");
+
+    expect(finalStep.allReady).toBe(true);
+    expect(finalStep.room.players.every(p => p.ready)).toBe(true);
+  });
+});

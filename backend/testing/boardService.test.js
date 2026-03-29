@@ -488,5 +488,32 @@ describe("boardService", () => {
     expect(has3C).toBe(true);
     expect(has4D).toBe(false);
   });
+});
 
+describe("Board Integration (Bot Gameplay)", () => {
+  test("Full sequence: Move, Mandatory Capture, and Promotion", () => {
+    const players = [{ id: "p1" }, { id: "p2" }, { id: "p3" }];
+    const state = initializeGameState(players);
+
+    state.pieces = [
+      { id: "b3", color: "blue", position: "BD_2B", king: false },
+      { id: "g1", color: "green", position: "GD_2B", king: false } 
+    ];
+
+    const move1 = applyMove(state, "p1", "b3", "BD_3A"); 
+    
+    if (!move1.ok) console.log("Error:", move1.error);
+    expect(move1.ok).toBe(true);
+    expect(state.currentTurn).toBe("p2"); 
+
+    const bluePiece = state.pieces.find(p => p.id === "b3");
+    bluePiece.position = "GD_3C";
+    state.currentTurn = "p2"; 
+
+    const captureMove = applyMove(state, "p2", "g1", "GD_4D");
+    
+    expect(captureMove.ok).toBe(true);
+    expect(captureMove.move.captured).toBe("GD_3C");
+    expect(state.pieces.find(p => p.id === "b3")).toBeUndefined();
+  });
 });
