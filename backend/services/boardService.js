@@ -16,6 +16,12 @@
 // scripts/buildJumpGraph.js) and is stored as a plain cell-name constant.
 // =============================================================================
 
+const FORWARD_DIRECTIONS = {
+  blue:  ["N", "NE", "NW"],
+  green: ["S", "SE", "NE"], // Moving toward Red/Blue
+  red:   ["S", "SW", "NW"]  // Moving toward Green/Blue
+};
+
 const STARTING_CELLS = {
   outerPlayable: ["1A", "3A", "2B", "1C", "3C", "2D"],
   innerPlayable: ["E1", "G1", "F2", "E3", "G3", "H2"],
@@ -37,12 +43,34 @@ const CROSS_SECTOR_EDGES = [
   ["BD_4B", "GL_H4"], ["BD_4B", "GL_F4"], ["BD_4D", "GL_F4"],
   ["GD_4B", "RL_H4"], ["GD_4B", "RL_F4"], ["GD_4D", "RL_F4"],
   ["RD_4D", "BD_4D"], ["BD_4D", "GD_4D"], ["GD_4D", "RD_4D"],
+  // Hub-to-inner diagonal connections: the *D hub cells are collinear with
+  // the opposing color's *F4 inner cells (confirmed by JUMP_GRAPH geometry).
+  ["RD_4D", "BL_F4"], ["BD_4D", "GL_F4"], ["GD_4D", "RL_F4"],
 ];
+
+const PROMOTION_ZONES = {
+  // Blue promotes on the far Row 1 edges of Green and Red
+  blue: [
+    "GD_1A", "GD_1C", "GL_E1", "GL_G1", 
+    "RD_1A", "RD_1C", "RL_E1", "RL_G1"
+  ],
+  // Green promotes on the far Row 1 edges of Blue and Red
+  green: [
+    "BD_1A", "BD_1C", "BL_E1", "BL_G1", 
+    "RD_1A", "RD_1C", "RL_E1", "RL_G1"
+  ],
+  // Red promotes on the far Row 1 edges of Blue and Green
+  red: [
+    "BD_1A", "BD_1C", "BL_E1", "BL_G1", 
+    "GD_1A", "GD_1C", "GL_E1", "GL_G1"
+  ]
+};
 
 // ---------------------------------------------------------------------------
 // Movement graph (one-step diagonal moves)
 // ---------------------------------------------------------------------------
 
+// FIX (Bug 4): PLAYABLE_CELLS is populated after MOVEMENT_GRAPH is built below.
 const PLAYABLE_CELLS = new Set();
 
 function buildMovementGraph() {
@@ -55,63 +83,113 @@ function buildMovementGraph() {
     graph[b].add(a);
   }
 
-  for (const { outer, inner } of Object.values(STARTING_SECTORS)) {
-    const outerPlayable = PLAYABLE_CELL_PATTERNS.outer.map(c => `${outer}_${c}`);
-    const innerPlayable = PLAYABLE_CELL_PATTERNS.inner.map(c => `${inner}_${c}`);
-    [...outerPlayable, ...innerPlayable].forEach(p => {
-      PLAYABLE_CELLS.add(p);
-      if (!graph[p]) graph[p] = new Set();
-    });
+  const sectors = [
+    { out: 'BD', inn: 'BL' },
+    { out: 'GD', inn: 'GL' },
+    { out: 'RD', inn: 'RL' }
+  ];
 
-    addEdge(`${outer}_1A`, `${outer}_2B`);
-    addEdge(`${outer}_1C`, `${outer}_2B`);
-    addEdge(`${outer}_1C`, `${outer}_2D`);
-    addEdge(`${outer}_2B`, `${outer}_3A`);
-    addEdge(`${outer}_2B`, `${outer}_3C`);
-    addEdge(`${outer}_2D`, `${outer}_3C`);
-    addEdge(`${outer}_3A`, `${outer}_4B`);
-    addEdge(`${outer}_3C`, `${outer}_4B`);
-    addEdge(`${outer}_3C`, `${outer}_4D`);
-    addEdge(`${outer}_1C`, `${inner}_E1`);
-    addEdge(`${outer}_2D`, `${inner}_E1`);
-    addEdge(`${outer}_2D`, `${inner}_E3`);
-    addEdge(`${outer}_4D`, `${inner}_E3`);
-    addEdge(`${inner}_E1`, `${inner}_F2`);
-    addEdge(`${inner}_E3`, `${inner}_F2`);
-    addEdge(`${inner}_E3`, `${inner}_F4`);
-    addEdge(`${inner}_F2`, `${inner}_G1`);
-    addEdge(`${inner}_F2`, `${inner}_G3`);
-    addEdge(`${inner}_F4`, `${inner}_G3`);
-    addEdge(`${inner}_G1`, `${inner}_H2`);
-    addEdge(`${inner}_G3`, `${inner}_H2`);
-    addEdge(`${inner}_G3`, `${inner}_H4`);
-  }
+  sectors.forEach(({ out, inn }) => {
+    // Outer Diamond
+    addEdge(`${out}_1A`, `${out}_2B`);
+    addEdge(`${out}_1C`, `${out}_2B`);
+    addEdge(`${out}_1C`, `${out}_2D`);
+    addEdge(`${out}_2B`, `${out}_3A`);
+    addEdge(`${out}_2B`, `${out}_3C`);
+    addEdge(`${out}_2D`, `${out}_3C`);
+    addEdge(`${out}_3A`, `${out}_4B`);
+    addEdge(`${out}_3C`, `${out}_4B`);
+    addEdge(`${out}_3C`, `${out}_4D`);
 
-  CROSS_SECTOR_EDGES.forEach(([a, b]) => addEdge(a, b));
+    // Inner Diamond
+    addEdge(`${inn}_E1`, `${inn}_F2`);
+    addEdge(`${inn}_E3`, `${inn}_F2`);
+    addEdge(`${inn}_E3`, `${inn}_F4`);
+    addEdge(`${inn}_F2`, `${inn}_G1`);
+    addEdge(`${inn}_F2`, `${inn}_G3`);
+    addEdge(`${inn}_F4`, `${inn}_G3`);
+    addEdge(`${inn}_G1`, `${inn}_H2`);
+    addEdge(`${inn}_G3`, `${inn}_H2`);
+    addEdge(`${inn}_G3`, `${inn}_H4`);
 
+    // THE CRITICAL BRIDGES
+    addEdge(`${out}_1C`, `${inn}_E1`);
+    addEdge(`${out}_2D`, `${inn}_E1`);
+    addEdge(`${out}_2D`, `${inn}_E3`);
+    addEdge(`${out}_4D`, `${inn}_E3`);
+  });
+
+  // Center Hub Connections (triangular hub between the three color zones)
+  addEdge("RD_4D", "BD_4D"); 
+  addEdge("BD_4D", "GD_4D"); 
+  addEdge("GD_4D", "RD_4D");
+
+  // Hub-to-inner diagonal connections.
+  // RL_E3, RD_4D, and BL_F4 are collinear (and likewise for the other two
+  // color pairs), so each hub cell is a direct neighbor of the opposing
+  // color's F4 inner cell. These were missing, causing moves like
+  // r10@RD_4D -> BL_F4 to be rejected as "Invalid move path".
+  addEdge("RD_4D", "BL_F4");
+  addEdge("BD_4D", "GL_F4");
+  addEdge("GD_4D", "RL_F4");
+
+  // Cross-sector outer edges
+  addEdge("RD_4B", "BL_H4");
+  addEdge("RD_4B", "BL_F4");
+  addEdge("BD_4B", "GL_H4");
+  addEdge("BD_4B", "GL_F4");
+  addEdge("GD_4B", "RL_H4");
+  addEdge("GD_4B", "RL_F4");
+
+  // Convert Sets to Arrays for final graph
   return Object.fromEntries(
-    Object.entries(graph).map(([k, v]) => [k, [...v].sort()])
+    Object.entries(graph).map(([k, v]) => [k, Array.from(v)])
   );
 }
 
 const MOVEMENT_GRAPH = buildMovementGraph();
 
+// FIX (Bug 4): Populate PLAYABLE_CELLS from the built graph.
+Object.keys(MOVEMENT_GRAPH).forEach(cell => PLAYABLE_CELLS.add(cell));
+
+// ---------------------------------------------------------------------------
+// Forward-direction tables (BFS from each color's promotion zones)
+//
+// isForwardMove previously used JUMP_GRAPH to infer direction, but that fails
+// for terminal edges (e.g. G1<->H2 in each inner sector) which are real
+// movement edges that no jump ever crosses. BFS from promotion zones gives
+// a distance-to-goal for every cell; a step is "forward" iff it decreases
+// that distance. Computed once at module load, O(cells) time and space.
+// ---------------------------------------------------------------------------
+
+function buildForwardDistances(color) {
+  const dist = {};
+  const queue = [...PROMOTION_ZONES[color]];
+  queue.forEach(c => { dist[c] = 0; });
+  let i = 0;
+  while (i < queue.length) {
+    const curr = queue[i++];
+    for (const nb of (MOVEMENT_GRAPH[curr] || [])) {
+      if (dist[nb] === undefined) {
+        dist[nb] = dist[curr] + 1;
+        queue.push(nb);
+      }
+    }
+  }
+  return dist;
+}
+
+const FORWARD_DISTANCES = {
+  blue:  buildForwardDistances("blue"),
+  green: buildForwardDistances("green"),
+  red:   buildForwardDistances("red"),
+};
+
 // ---------------------------------------------------------------------------
 // Jump graph (capture moves)
-//
-// Derived from MOVEMENT_GRAPH + cell coordinates at build time.
-// On this board, the movement graph alone is insufficient to determine valid
-// jumps: hub cells (e.g. RD_4D) sit at the crossing of multiple non-collinear
-// diagonals, so "neighbor of neighbor" produces false positives. The coordinates
-// resolve ambiguity by checking that the jumped-over cell lies on the straight
-// line between source and landing (midpoint proximity test, threshold 50px).
-//
-// This constant was produced by scripts/buildJumpGraph.js — do not edit manually.
-// To regenerate: node buildJumpGraph.js
 // ---------------------------------------------------------------------------
 
 // JUMP_GRAPH[from] = [{ over, to }, ...]
-// 138 jump pairs across 48 cells
 const JUMP_GRAPH = {
   // --- BLUE SECTOR ---
   "BD_1A": [{ over: "BD_2B", to: "BD_3C" }],
@@ -345,21 +423,101 @@ function advanceTurn(gameState) {
 // Move validation helpers
 // ---------------------------------------------------------------------------
 
+function getNeighbors(pos) {
+  const n = MOVEMENT_GRAPH[pos];
+  if (!n) return [];
+  if (Array.isArray(n)) return n;
+  if (n instanceof Set) return Array.from(n);
+  return Object.values(n);
+}
+
+// A move from→to is forward for a pawn iff it decreases the BFS distance
+// to that color's promotion zones. This correctly handles all edges including
+// terminal edges like G1<->H2 that JUMP_GRAPH never covers.
+function isForwardMove(from, to, color) {
+  const dist = FORWARD_DISTANCES[color];
+  return (dist[to] ?? Infinity) < (dist[from] ?? Infinity);
+}
+
 function getSimpleMoves(gameState, piece) {
-  return (MOVEMENT_GRAPH[piece.position] || []).filter(
-    pos => !getPieceAtPosition(gameState, pos)
-  );
+  const moves = new Set();
+  const neighbors = MOVEMENT_GRAPH[piece.position] || [];
+
+  neighbors.forEach(neighbor => {
+    if (getPieceAtPosition(gameState, neighbor)) return;
+
+    if (!piece.king) {
+      // PAWNS: Only forward one-step moves.
+      if (isForwardMove(piece.position, neighbor, piece.color)) {
+        moves.add(neighbor);
+      }
+    } else {
+      // KINGS: Can move one step in any direction.
+      moves.add(neighbor);
+
+      // FIX (Bug 1): Kings can slide along straight lines (like a long-range
+      // king in international draughts). We extend step-by-step using
+      // JUMP_GRAPH to identify collinear cells. The loop continues as long as
+      // the next cell in the line is empty; it stops (without adding) when
+      // a piece blocks the path.
+      let prev = piece.position;
+      let curr = neighbor;
+      while (true) {
+        // Find the cell directly beyond `curr` in the same straight line
+        // by looking for a JUMP_GRAPH entry from `prev` that passes over `curr`.
+        const straightEntry = (JUMP_GRAPH[prev] || []).find(j => j.over === curr);
+        if (!straightEntry) break; // No further cell in this direction.
+
+        const nextCell = straightEntry.to;
+        if (getPieceAtPosition(gameState, nextCell)) break; // Blocked — stop here.
+
+        moves.add(nextCell);
+        prev = curr;
+        curr = nextCell;
+      }
+    }
+  });
+  return Array.from(moves);
 }
 
 function getCaptureMoves(gameState, piece) {
-  return (JUMP_GRAPH[piece.position] || []).filter(({ over, to }) => {
-    const target = getPieceAtPosition(gameState, over);
-    return (
-      target &&
-      target.color !== piece.color &&
-      !getPieceAtPosition(gameState, to)
-    );
+  const captures = [];
+  const jumps = JUMP_GRAPH[piece.position] || [];
+
+  jumps.forEach(jump => {
+    const victim = getPieceAtPosition(gameState, jump.over);
+    const landing = getPieceAtPosition(gameState, jump.to);
+
+    if (victim && victim.color !== piece.color && !landing) {
+      captures.push(jump);
+
+      // FIX (Bug 2): Flying king post-jump extension. After landing at jump.to,
+      // we continue along the same straight line. The next step searches
+      // JUMP_GRAPH[jump.over] for an entry whose `over` is `jump.to`, giving
+      // us the cell directly beyond `jump.to` on the same diagonal. This was
+      // previously searching from `currOver` for `j.over === currTo`, which
+      // pivots at the wrong cell (the captured piece rather than the landing).
+      if (piece.king) {
+        let prevOver = jump.over;
+        let currTo   = jump.to;
+        while (true) {
+          // The cell beyond `currTo` in the same line: look in JUMP_GRAPH
+          // from `prevOver` for a jump whose `over` is `currTo`.
+          // That entry's `to` is the next cell on the ray.
+          const extension = (JUMP_GRAPH[prevOver] || []).find(j => j.over === currTo);
+          if (!extension) break; // End of the line.
+
+          const nextLanding = extension.to;
+          if (getPieceAtPosition(gameState, nextLanding)) break; // Cell occupied.
+
+          captures.push({ over: jump.over, to: nextLanding });
+          prevOver = currTo;
+          currTo   = nextLanding;
+        }
+      }
+    }
   });
+  return captures;
 }
 
 function hasAnyCapture(gameState, color) {
@@ -398,7 +556,7 @@ function initializeGameState(players) {
     pieces: createInitialPieces(),
     colorAssignments,
     currentTurn: players[0].id,
-    captureChain: null,   // { pieceId } | null — locks multi-capture to one piece
+    captureChain: null,
     status: "active",
     winner: null,
   };
@@ -408,70 +566,114 @@ function initializeGameState(players) {
 // Move application
 // ---------------------------------------------------------------------------
 
+function getLine(startCell, firstStep) {
+  const line = [firstStep];
+  let prev = startCell;
+  let curr = firstStep;
+
+  while (true) {
+    const straightPath = JUMP_GRAPH[prev]?.find(j => j.over === curr);
+    if (straightPath) {
+      line.push(straightPath.to);
+      prev = curr;
+      curr = straightPath.to;
+    } else {
+      break;
+    }
+  }
+  return line;
+}
+
 function applyMove(gameState, playerId, pieceId, to) {
-  if (!gameState)                         return { ok: false, error: "Game state missing" };
-  if (gameState.status !== "active")      return { ok: false, error: "Game is not active" };
-  if (gameState.currentTurn !== playerId) return { ok: false, error: "It is not your turn" };
+  // 1. Basic State & Turn Validation
+  if (!gameState || gameState.status !== "active") {
+    return { ok: false, error: "Game not active" };
+  }
+  if (gameState.currentTurn !== playerId) {
+    return { ok: false, error: "Not your turn" };
+  }
 
   const piece = getPieceById(gameState, pieceId);
-  if (!piece) return { ok: false, error: "Piece not found" };
-
   const playerColor = getPlayerColor(gameState, playerId);
-  if (!playerColor)                return { ok: false, error: "Player color not found" };
-  if (piece.color !== playerColor) return { ok: false, error: "You can only move your own pieces" };
 
+  if (!piece || piece.color !== playerColor) {
+    return { ok: false, error: "Invalid piece or piece does not belong to you" };
+  }
+
+  // 2. Multi-jump Continuity Check
   if (gameState.captureChain && gameState.captureChain.pieceId !== pieceId) {
-    return { ok: false, error: "You must continue capturing with the same piece" };
+    return { ok: false, error: "Must continue jump sequence with the same piece" };
   }
 
-  if (!PLAYABLE_CELLS.has(to)) {
-    return { ok: false, error: "Target cell is not a playable square" };
-  }
-
+  // 3. Target Occupancy Check
   if (getPieceAtPosition(gameState, to)) {
-    return { ok: false, error: "Destination is occupied" };
+    return { ok: false, error: "Target cell is occupied" };
   }
 
-  // Check for capture move first
-  const captureMove = getCaptureMoves(gameState, piece).find(j => j.to === to);
+  const from = piece.position;
+  let capturedCell = null;
+  let promoted = false;
 
-  if (captureMove) {
-    const from = piece.position;
-    const capturedPiece = getPieceAtPosition(gameState, captureMove.over);
+  // 4. Resolve Captures (High Priority)
+  const jumpMoves = getCaptureMoves(gameState, piece);
+  const jump = jumpMoves.find(j => j.to === to);
 
-    gameState.pieces = gameState.pieces.filter(p => p.id !== capturedPiece.id);
+  if (jump) {
+    const victim = getPieceAtPosition(gameState, jump.over);
+    gameState.pieces = gameState.pieces.filter(p => p.id !== victim.id);
     piece.position = to;
+    capturedCell = jump.over;
 
-    const furtherCaptures = getCaptureMoves(gameState, piece);
-    if (furtherCaptures.length > 0) {
+    if (!piece.king && PROMOTION_ZONES[playerColor].includes(to)) {
+      piece.king = true;
+      promoted = true;
+    }
+
+    const canJumpAgain = getCaptureMoves(gameState, piece).length > 0;
+    
+    if (canJumpAgain && !promoted) {
       gameState.captureChain = { pieceId: piece.id };
     } else {
       gameState.captureChain = null;
       advanceTurn(gameState);
     }
 
-    return { ok: true, move: { pieceId, from, to, captured: captureMove.over } };
+    return { 
+      ok: true, 
+      move: { pieceId, from, to, captured: capturedCell, promoted } 
+    };
   }
 
-  // Simple move
-  if (gameState.captureChain) {
-    return { ok: false, error: "You must capture — a jump is available" };
-  }
-
+  // 5. Resolve Simple Moves (Only if no jumps are mandatory)
+  // FIX (Bug 5): Removed the redundant `gameState.captureChain` check here.
+  // By this point, if captureChain were set, the piece-continuity check in
+  // step 2 would already have caught any wrong-piece attempt. The captureChain
+  // guard here would incorrectly block the continuing piece from making a
+  // valid non-capture move after the chain is exhausted (a state that can't
+  // occur, but the stale check created confusing logic). Only hasAnyCapture
+  // is needed to enforce the mandatory-jump rule.
   if (hasAnyCapture(gameState, playerColor)) {
-    return { ok: false, error: "You must capture — a jump is available" };
+    return { ok: false, error: "Mandatory capture rule: You must perform a jump." };
   }
 
-  const simpleMoves = getSimpleMoves(gameState, piece);
-  if (!simpleMoves.includes(to)) {
-    return { ok: false, error: "Invalid move" };
+  const validSimples = getSimpleMoves(gameState, piece);
+  if (validSimples.includes(to)) {
+    piece.position = to;
+
+    if (!piece.king && PROMOTION_ZONES[playerColor].includes(to)) {
+      piece.king = true;
+      promoted = true;
+    }
+
+    advanceTurn(gameState);
+    return { 
+      ok: true, 
+      move: { pieceId, from, to, captured: null, promoted } 
+    };
   }
 
-  const from = piece.position;
-  piece.position = to;
-  advanceTurn(gameState);
-
-  return { ok: true, move: { pieceId, from, to, captured: null } };
+  // 6. Fallback
+  return { ok: false, error: "Invalid move path" };
 }
 
 module.exports = {
