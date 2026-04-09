@@ -413,10 +413,82 @@ function getTurnOrder(gameState) {
   return Object.keys(gameState.colorAssignments);
 }
 
+function ensureGameStateMeta(gameState) {
+  if (!gameState.pieceCounts) {
+    gameState.pieceCounts = countPiecesByColor(gameState.pieces || []);
+  }
+  if (!gameState.eliminatedPlayers) {
+    gameState.eliminatedPlayers = [];
+  }
+  if (!gameState.rankings) {
+    gameState.rankings = [];
+  }
+}
+
+function getPlayerIdByColor(gameState, color) {
+  return Object.entries(gameState.colorAssignments).find(([, assignedColor]) => assignedColor === color)?.[0] || null;
+}
+
+function countPiecesByColor(pieces) {
+  return {
+    blue: pieces.filter(piece => piece.color === "blue").length,
+    green: pieces.filter(piece => piece.color === "green").length,
+    red: pieces.filter(piece => piece.color === "red").length,
+  };
+}
+
+function isPlayerEliminated(gameState, playerId) {
+  return gameState.eliminatedPlayers.some(player => player.playerId === playerId);
+}
+
+function getActivePlayerIds(gameState) {
+  return getTurnOrder(gameState).filter(playerId => !isPlayerEliminated(gameState, playerId));
+}
+
 function advanceTurn(gameState) {
-  const order = getTurnOrder(gameState);
-  const next = (order.indexOf(gameState.currentTurn) + 1) % order.length;
+  const order = getActivePlayerIds(gameState);
+  if (order.length === 0) {
+    gameState.currentTurn = null;
+    return;
+  }
+
+  const currentIndex = order.indexOf(gameState.currentTurn);
+  const next = currentIndex === -1 ? 0 : (currentIndex + 1) % order.length;
   gameState.currentTurn = order[next];
+}
+
+function handleEliminations(gameState, affectedColor) {
+  const eliminated = [];
+  const remainingPieces = gameState.pieceCounts[affectedColor];
+  if (remainingPieces > 0) return eliminated;
+
+  const eliminatedPlayerId = getPlayerIdByColor(gameState, affectedColor);
+  if (!eliminatedPlayerId || isPlayerEliminated(gameState, eliminatedPlayerId)) {
+    return eliminated;
+  }
+
+  const place = 3 - gameState.eliminatedPlayers.length;
+  const eliminationRecord = { playerId: eliminatedPlayerId, color: affectedColor, place };
+  gameState.eliminatedPlayers.push(eliminationRecord);
+  gameState.rankings.push(eliminationRecord);
+  eliminated.push(eliminationRecord);
+
+  const activePlayers = getActivePlayerIds(gameState);
+  if (activePlayers.length === 1) {
+    const winnerId = activePlayers[0];
+    const winnerColor = getPlayerColor(gameState, winnerId);
+
+    if (!gameState.rankings.some(entry => entry.playerId === winnerId)) {
+      gameState.rankings.unshift({ playerId: winnerId, color: winnerColor, place: 1 });
+    }
+
+    gameState.winner = winnerId;
+    gameState.status = "finished";
+    gameState.captureChain = null;
+    gameState.currentTurn = null;
+  }
+
+  return eliminated;
 }
 
 // ---------------------------------------------------------------------------
@@ -552,9 +624,14 @@ function initializeGameState(players) {
     colorAssignments[player.id] = colorOrder[index];
   });
 
+  const pieces = createInitialPieces();
+
   return {
-    pieces: createInitialPieces(),
+    pieces,
     colorAssignments,
+    pieceCounts: countPiecesByColor(pieces),
+    eliminatedPlayers: [],
+    rankings: [],
     currentTurn: players[0].id,
     captureChain: null,
     status: "active",
@@ -585,6 +662,8 @@ function getLine(startCell, firstStep) {
 }
 
 function applyMove(gameState, playerId, pieceId, to) {
+  ensureGameStateMeta(gameState);
+
   // 1. Basic State & Turn Validation
   if (!gameState || gameState.status !== "active") {
     return { ok: false, error: "Game not active" };
@@ -621,12 +700,24 @@ function applyMove(gameState, playerId, pieceId, to) {
   if (jump) {
     const victim = getPieceAtPosition(gameState, jump.over);
     gameState.pieces = gameState.pieces.filter(p => p.id !== victim.id);
+    gameState.pieceCounts = countPiecesByColor(gameState.pieces);
     piece.position = to;
     capturedCell = jump.over;
+    const eliminated = handleEliminations(gameState, victim.color);
 
     if (!piece.king && PROMOTION_ZONES[playerColor].includes(to)) {
       piece.king = true;
       promoted = true;
+    }
+
+    if (gameState.status === "finished") {
+      return {
+        ok: true,
+        move: { pieceId, from, to, captured: capturedCell, promoted },
+        eliminated,
+        rankings: gameState.rankings,
+        winner: gameState.winner,
+      };
     }
 
     const canJumpAgain = getCaptureMoves(gameState, piece).length > 0;
@@ -640,7 +731,10 @@ function applyMove(gameState, playerId, pieceId, to) {
 
     return { 
       ok: true, 
-      move: { pieceId, from, to, captured: capturedCell, promoted } 
+      move: { pieceId, from, to, captured: capturedCell, promoted },
+      eliminated,
+      rankings: gameState.rankings,
+      winner: gameState.winner,
     };
   }
 
@@ -668,7 +762,10 @@ function applyMove(gameState, playerId, pieceId, to) {
     advanceTurn(gameState);
     return { 
       ok: true, 
-      move: { pieceId, from, to, captured: null, promoted } 
+      move: { pieceId, from, to, captured: null, promoted },
+      eliminated: [],
+      rankings: gameState.rankings,
+      winner: gameState.winner,
     };
   }
 

@@ -155,7 +155,12 @@ socket.on("gameState", (state) => {
     renderPieces(svg);
   }
 
+  renderScoreboard();
   updateTurnDisplay();
+
+  if (boardState.status === "finished") {
+    showEndScreen();
+  }
 });
 
 socket.on("errorMessage", (message) => {
@@ -488,6 +493,34 @@ function showMoveFeedback(message, type = "info") {
   }, 1600);
 }
 
+function getPlayerLabelByColor(color) {
+  if (color === "blue") return "Blue";
+  if (color === "green") return "Green";
+  if (color === "red") return "Red";
+  return color;
+}
+
+function renderScoreboard() {
+  const scoreboard = document.getElementById("scoreboard");
+  if (!scoreboard || !boardState || !boardState.pieceCounts) return;
+
+  const eliminated = new Map((boardState.eliminatedPlayers || []).map(entry => [entry.color, entry.place]));
+  const colors = ["blue", "green", "red"];
+
+  scoreboard.innerHTML = colors.map(color => {
+    const place = eliminated.get(color);
+    const suffix = place ? `${place}${place === 1 ? "st" : place === 2 ? "nd" : "rd"}` : "Active";
+    return `
+      <div class="score-chip ${color}${place ? " eliminated" : ""}">
+        <span class="score-dot"></span>
+        <span class="score-name">${getPlayerLabelByColor(color)}</span>
+        <span class="score-count">${boardState.pieceCounts[color] ?? 0}</span>
+        <span class="score-status">${place ? `Eliminated | ${suffix}` : suffix}</span>
+      </div>
+    `;
+  }).join("");
+}
+
 // Updates the turn display based on the current board state.
 function updateTurnDisplay() {
   if (!boardState || !boardState.currentTurn || !boardState.colorAssignments) {
@@ -517,12 +550,13 @@ function updateTurnDisplay() {
 }
 
 async function showGame() {
-  content.display = "block";
+  content.style.display = "block";
   content.innerHTML = `
     <h2>Game Started</h2>
     <div id="turnIndicator">
       <span id="turnText">Waiting for turn info...</span>
     </div>
+    <div id="scoreboard"></div>
     <div id="moveFeedback" class="move-feedback"></div>
     <div id="boardContainer"></div>
     <button id="endBtn">End Game (Simulate)</button>
@@ -536,14 +570,21 @@ async function showGame() {
   const svg = document.querySelector("#boardContainer svg");
   renderCellTargets(svg);
   renderPieces(svg);
+  renderScoreboard();
   updateTurnDisplay();
 }
 
 function showEndScreen() {
-  content.display = "block";
+  content.style.display = "block";
+  const rankings = (boardState?.rankings || []).slice().sort((a, b) => a.place - b.place);
+  const winner = rankings.find(entry => entry.place === 1);
   content.innerHTML = `
     <h2>Game Over</h2>
-    <p>Winner: Player X (placeholder)</p>
+    <p>Winner: ${winner ? getPlayerLabelByColor(winner.color) : "Unknown"}</p>
+    <div class="final-rankings">
+      ${rankings.map(entry => `<p>${entry.place}. ${getPlayerLabelByColor(entry.color)}</p>`).join("")}
+    </div>
     <button id="menuBtn">Return to Menu</button>
   `;
 }
+

@@ -33,7 +33,7 @@ describe("boardService", () => {
 
     const result = applyMove(gameState, "player-1", "b2", "BD_4B");
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       move: {
         pieceId: "b2",
@@ -103,7 +103,7 @@ describe("boardService", () => {
 
     const result = applyMove(gameState, "player-1", "b1", "BD_3C");
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       move: {
         pieceId: "b1",
@@ -115,8 +115,86 @@ describe("boardService", () => {
     });
     expect(gameState.pieces.find(piece => piece.id === "b1").position).toBe("BD_3C");
     expect(gameState.pieces.find(piece => piece.id === "g1")).toBeUndefined();
+    expect(gameState.pieceCounts.green).toBe(0);
     expect(gameState.captureChain).toBeNull();
-    expect(gameState.currentTurn).toBe("player-2");
+    expect(gameState.status).toBe("active");
+    expect(gameState.winner).toBeNull();
+    expect(gameState.rankings).toEqual([
+      { playerId: "player-2", color: "green", place: 3 },
+    ]);
+    expect(gameState.currentTurn).toBe("player-3");
+  });
+
+  test("applyMove eliminates a player and skips their turn when more than one opponent remains", () => {
+    const gameState = {
+      pieces: [
+        { id: "b1", color: "blue", position: "BD_1A", king: false },
+        { id: "g1", color: "green", position: "BD_2B", king: false },
+        { id: "r1", color: "red", position: "RD_1A", king: false },
+      ],
+      colorAssignments: {
+        "player-1": "blue",
+        "player-2": "green",
+        "player-3": "red",
+      },
+      pieceCounts: { blue: 1, green: 1, red: 1 },
+      eliminatedPlayers: [],
+      rankings: [],
+      currentTurn: "player-1",
+      captureChain: null,
+      status: "active",
+      winner: null,
+    };
+
+    const result = applyMove(gameState, "player-1", "b1", "BD_3C");
+
+    expect(result.ok).toBe(true);
+    expect(result.eliminated).toEqual([
+      { playerId: "player-2", color: "green", place: 3 },
+    ]);
+    expect(gameState.pieceCounts).toEqual({ blue: 1, green: 0, red: 1 });
+    expect(gameState.eliminatedPlayers).toEqual([
+      { playerId: "player-2", color: "green", place: 3 },
+    ]);
+    expect(gameState.currentTurn).toBe("player-3");
+    expect(gameState.status).toBe("active");
+  });
+
+  test("applyMove ends the game when only one player remains after elimination", () => {
+    const gameState = {
+      pieces: [
+        { id: "r1", color: "red", position: "RD_1A", king: false },
+        { id: "g1", color: "green", position: "RD_2B", king: false },
+      ],
+      colorAssignments: {
+        "player-1": "red",
+        "player-2": "blue",
+        "player-3": "green",
+      },
+      pieceCounts: { blue: 0, green: 1, red: 1 },
+      eliminatedPlayers: [
+        { playerId: "player-2", color: "blue", place: 3 },
+      ],
+      rankings: [
+        { playerId: "player-2", color: "blue", place: 3 },
+      ],
+      currentTurn: "player-1",
+      captureChain: null,
+      status: "active",
+      winner: null,
+    };
+
+    const result = applyMove(gameState, "player-1", "r1", "RD_3C");
+
+    expect(result.ok).toBe(true);
+    expect(gameState.status).toBe("finished");
+    expect(gameState.winner).toBe("player-1");
+    expect(gameState.currentTurn).toBeNull();
+    expect(gameState.rankings).toEqual([
+      { playerId: "player-1", color: "red", place: 1 },
+      { playerId: "player-2", color: "blue", place: 3 },
+      { playerId: "player-3", color: "green", place: 2 },
+    ]);
   });
 
   test("applyMove rejects a simple move when another piece has a capture available", () => {
