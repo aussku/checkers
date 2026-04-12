@@ -693,6 +693,13 @@ function applyMove(gameState, playerId, pieceId, to) {
   let capturedCell = null;
   let promoted = false;
 
+  if (!piece.king) {
+    const isCapture = (JUMP_GRAPH[from] || []).some(j => j.to === to);
+    if (!isCapture && !isForwardMove(from, to, playerColor)) {
+      return { ok: false, error: "Regular pieces cannot move backwards" };
+    }
+  }
+
   // 4. Resolve Captures (High Priority)
   const jumpMoves = getCaptureMoves(gameState, piece);
   const jump = jumpMoves.find(j => j.to === to);
