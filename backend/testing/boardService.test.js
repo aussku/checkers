@@ -47,6 +47,21 @@ describe("boardService", () => {
     expect(gameState.currentTurn).toBe("player-2");
   });
 
+  test("initializeGameState uses stored player names and colors", () => {
+    const gameState = initializeGameState([
+      { id: "player-1", name: "Ada", color: "red" },
+      { id: "player-2", name: "Ben", color: "blue" },
+      { id: "player-3", name: "Cy", color: "green" },
+    ]);
+
+    expect(gameState.colorAssignments).toEqual({
+      "player-1": "red",
+      "player-2": "blue",
+      "player-3": "green",
+    });
+    expect(gameState.playerMeta["player-1"]).toEqual({ name: "Ada", color: "red" });
+  });
+
   test("applyMove rejects moving a piece that belongs to another player", () => {
     const gameState = initializeGameState(players);
 

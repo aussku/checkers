@@ -3,6 +3,7 @@ const {
   createRoom,
   joinRoom,
   toggleReady,
+  updatePlayerSettings,
 } = require("../services/roomService");
 
 describe("roomService", () => {
@@ -15,7 +16,9 @@ describe("roomService", () => {
 
     expect(room.code).toHaveLength(4);
     expect(room.hostId).toBe("host-1");
-    expect(room.players).toEqual([{ id: "host-1", ready: false }]);
+    expect(room.players).toEqual([
+      { id: "host-1", ready: false, name: "Player 1", color: "blue" },
+    ]);
     expect(room.maxPlayers).toBe(3);
     expect(rooms.get(room.code)).toBe(room);
   });
@@ -32,10 +35,30 @@ describe("roomService", () => {
 
     expect(result.allReady).toBe(true);
     expect(result.room.players).toEqual([
-      { id: "host-1", ready: true },
-      { id: "player-2", ready: true },
-      { id: "player-3", ready: true },
+      { id: "host-1", ready: true, name: "Player 1", color: "blue" },
+      { id: "player-2", ready: true, name: "Player 2", color: "green" },
+      { id: "player-3", ready: true, name: "Player 3", color: "red" },
     ]);
+  });
+
+  test("createRoom and joinRoom store player settings with unique colors", () => {
+    const room = createRoom("host-1", { name: "Ada", color: "red" });
+    joinRoom(room.code, "player-2", { name: "Ben", color: "red" });
+
+    expect(room.players).toEqual([
+      { id: "host-1", ready: false, name: "Ada", color: "red" },
+      { id: "player-2", ready: false, name: "Ben", color: "blue" },
+    ]);
+  });
+
+  test("updatePlayerSettings changes lobby name and available color", () => {
+    const room = createRoom("host-1", { name: "Ada", color: "blue" });
+    joinRoom(room.code, "player-2", { name: "Ben", color: "green" });
+
+    const updatedRoom = updatePlayerSettings("player-2", { name: "Bea", color: "red" });
+
+    expect(updatedRoom).toBe(room);
+    expect(room.players[1]).toMatchObject({ name: "Bea", color: "red" });
   });
 
   test("createRoom throws error if host already has a room", () => {

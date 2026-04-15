@@ -8,6 +8,14 @@ let gameState = {
   roomCode: null,
 };
 
+const DEFAULT_PLAYER_SETTINGS = {
+  name: "Player",
+  color: "blue",
+  showValidMoves: true,
+};
+
+let playerSettings = loadPlayerSettings();
+
 // Board state is owned by the server. This is a local rendering copy only.
 let boardState = null;
 let selectedPieceId = null;
@@ -208,7 +216,10 @@ content.addEventListener("click", (e) => {
     const codeInput = document.getElementById("roomInput");
     const code = codeInput.value.trim().toUpperCase();
     if (code.length === 4) {
-      socket.emit("joinRoom", code);
+      socket.emit("joinRoom", {
+        code,
+        playerSettings: getBackendPlayerSettings(),
+      });
     } else {
       alert("Please enter a 4-character code.");
     }
@@ -235,9 +246,72 @@ content.addEventListener("click", (e) => {
   }
 });
 
+content.addEventListener("submit", (e) => {
+  if (e.target.id !== "settingsForm") return;
+
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const nextSettings = {
+    name: (formData.get("playerName") || "").toString().trim(),
+    color: (formData.get("playerColor") || DEFAULT_PLAYER_SETTINGS.color).toString(),
+    showValidMoves: formData.get("showValidMoves") === "off",
+  };
+
+  savePlayerSettings(nextSettings);
+
+  if (gameState.roomCode) {
+    socket.emit("updatePlayerSettings", getBackendPlayerSettings());
+  }
+
+  const status = document.getElementById("settingsStatus");
+  if (status) status.textContent = "Settings saved.";
+});
+
 // ---------------------------------------------------------------------------
 // Screen renderers
 // ---------------------------------------------------------------------------
+
+function loadPlayerSettings() {
+  try {
+    const savedSettings = JSON.parse(localStorage.getItem("playerSettings") || "{}");
+    return normalizePlayerSettings(savedSettings);
+  } catch (error) {
+    return { ...DEFAULT_PLAYER_SETTINGS };
+  }
+}
+
+function normalizePlayerSettings(settings) {
+  const validColors = ["blue", "green", "red"];
+  const name = typeof settings.name === "string" ? settings.name.trim().slice(0, 20) : "";
+  const color = validColors.includes(settings.color) ? settings.color : DEFAULT_PLAYER_SETTINGS.color;
+
+  return {
+    name: name || DEFAULT_PLAYER_SETTINGS.name,
+    color,
+    showValidMoves: settings.showValidMoves !== false,
+  };
+}
+
+function savePlayerSettings(nextSettings) {
+  playerSettings = normalizePlayerSettings(nextSettings);
+  localStorage.setItem("playerSettings", JSON.stringify(playerSettings));
+}
+
+function getBackendPlayerSettings() {
+  return {
+    name: playerSettings.name,
+    color: playerSettings.color,
+  };
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 function showMenu() {
   content.style.display = "none"
@@ -268,17 +342,48 @@ function showRules() {
 }
 
 function showSettings() {
+  const colorOptions = ["blue", "green", "red"];
+
   menu.style.display = "none";
   content.style.display = "block";
   content.innerHTML = `
     <h2>Settings</h2>
-    <p>Settings placeholder (board size, timer, etc.)</p>
+    <form id="settingsForm" class="settings-panel">
+      <label class="settings-field" for="playerName">
+        <span>Player name</span>
+        <input id="playerName" name="playerName" type="text" maxlength="20"
+          value="${escapeHtml(playerSettings.name)}" placeholder="Player">
+      </label>
+
+      <fieldset class="settings-field">
+        <legend>Player color</legend>
+        <div class="color-options">
+          ${colorOptions.map(color => `
+            <label class="color-option ${color}">
+              <input type="radio" name="playerColor" value="${color}"
+                ${playerSettings.color === color ? "checked" : ""}>
+              <span class="color-swatch"></span>
+              <span>${getPlayerLabelByColor(color)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </fieldset>
+
+      <label class="toggle-row">
+        <input type="checkbox" name="showValidMoves"
+          ${playerSettings.showValidMoves ? "checked" : ""}>
+        <span>Highlight valid moves</span>
+      </label>
+
+      <p id="settingsStatus" class="settings-status" aria-live="polite"></p>
+      <button type="submit" id="saveSettingsBtn">Save Settings</button>
+    </form>
     <button id="backBtn">Back</button>
   `;
 }
 
 function hostGame() {
-  socket.emit("createRoom");
+  socket.emit("createRoom", getBackendPlayerSettings());
 }
 
 function renderLobby() {
@@ -300,7 +405,12 @@ function renderLobby() {
     </div>
     <ul class="player-list">
       ${gameState.players.map((p, i) => `
-        <li>${p.ready ? "✅" : "⏳"} Player ${i + 1} ${p.id === socket.id ? "<strong>(You)</strong>" : ""}</li>
+        <li>
+          <span class="ready-state">${p.ready ? "Ready" : "Waiting"}</span>
+          <span class="player-color-dot ${p.color || "blue"}"></span>
+          <span>${escapeHtml(p.name || `Player ${i + 1}`)}</span>
+          ${p.id === socket.id ? "<strong>(You)</strong>" : ""}
+        </li>
       `).join("")}
     </ul>
     <button id="readyBtn" class="${me.ready ? "active" : ""}">
@@ -500,6 +610,27 @@ function getPlayerLabelByColor(color) {
   return color;
 }
 
+function getPlayerByColor(color) {
+  if (!boardState || !boardState.colorAssignments) return null;
+  const playerId = Object.entries(boardState.colorAssignments)
+    .find(([, assignedColor]) => assignedColor === color)?.[0];
+
+  if (!playerId) return null;
+
+  return {
+    id: playerId,
+    color,
+    name: boardState.playerMeta?.[playerId]?.name || getPlayerLabelByColor(color),
+  };
+}
+
+function getPlayerLabel(playerId) {
+  if (!boardState) return "Player";
+  const color = boardState.colorAssignments?.[playerId];
+  const fallback = color ? getPlayerLabelByColor(color) : "Player";
+  return boardState.playerMeta?.[playerId]?.name || fallback;
+}
+
 function renderScoreboard() {
   const scoreboard = document.getElementById("scoreboard");
   if (!scoreboard || !boardState || !boardState.pieceCounts) return;
@@ -509,11 +640,12 @@ function renderScoreboard() {
 
   scoreboard.innerHTML = colors.map(color => {
     const place = eliminated.get(color);
+    const player = getPlayerByColor(color);
     const suffix = place ? `${place}${place === 1 ? "st" : place === 2 ? "nd" : "rd"}` : "Active";
     return `
       <div class="score-chip ${color}${place ? " eliminated" : ""}">
         <span class="score-dot"></span>
-        <span class="score-name">${getPlayerLabelByColor(color)}</span>
+        <span class="score-name">${escapeHtml(player?.name || getPlayerLabelByColor(color))}</span>
         <span class="score-count">${boardState.pieceCounts[color] ?? 0}</span>
         <span class="score-status">${place ? `Eliminated | ${suffix}` : suffix}</span>
       </div>
@@ -537,11 +669,7 @@ function updateTurnDisplay() {
   if (currentPlayerId === socket.id) {
     turnText.textContent = "Your Turn!";
   } else {
-    let playerNumber;
-    if (currentColor === "blue") playerNumber = 1;
-    else if (currentColor === "green") playerNumber = 2;
-    else if (currentColor === "red") playerNumber = 3;
-    turnText.textContent = `Player ${playerNumber}'s Turn`;
+    turnText.textContent = `${getPlayerLabel(currentPlayerId)}'s Turn`;
   }
 
   turnText.style.color = currentColor;
@@ -580,9 +708,9 @@ function showEndScreen() {
   const winner = rankings.find(entry => entry.place === 1);
   content.innerHTML = `
     <h2>Game Over</h2>
-    <p>Winner: ${winner ? getPlayerLabelByColor(winner.color) : "Unknown"}</p>
+    <p>Winner: ${winner ? escapeHtml(getPlayerLabel(winner.playerId)) : "Unknown"}</p>
     <div class="final-rankings">
-      ${rankings.map(entry => `<p>${entry.place}. ${getPlayerLabelByColor(entry.color)}</p>`).join("")}
+      ${rankings.map(entry => `<p>${entry.place}. ${escapeHtml(getPlayerLabel(entry.playerId))}</p>`).join("")}
     </div>
     <button id="menuBtn">Return to Menu</button>
   `;

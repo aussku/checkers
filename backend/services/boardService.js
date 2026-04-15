@@ -620,8 +620,21 @@ function createInitialPieces() {
 function initializeGameState(players) {
   const colorOrder = ["blue", "green", "red"];
   const colorAssignments = {};
+  const playerMeta = {};
+  const assignedColors = new Set();
+
   players.forEach((player, index) => {
-    colorAssignments[player.id] = colorOrder[index];
+    const requestedColor = colorOrder.includes(player.color) ? player.color : colorOrder[index];
+    const assignedColor = assignedColors.has(requestedColor)
+      ? colorOrder.find(color => !assignedColors.has(color))
+      : requestedColor;
+
+    colorAssignments[player.id] = assignedColor;
+    assignedColors.add(assignedColor);
+    playerMeta[player.id] = {
+      name: player.name || `Player ${index + 1}`,
+      color: assignedColor,
+    };
   });
 
   const pieces = createInitialPieces();
@@ -629,6 +642,7 @@ function initializeGameState(players) {
   return {
     pieces,
     colorAssignments,
+    playerMeta,
     pieceCounts: countPiecesByColor(pieces),
     eliminatedPlayers: [],
     rankings: [],
