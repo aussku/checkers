@@ -1,4 +1,9 @@
-const { createRoom, joinRoom, toggleReady } = require("../services/roomService");
+const {
+  createRoom,
+  joinRoom,
+  toggleReady,
+  updatePlayerSettings,
+} = require("../services/roomService");
 const { initializeGameState } = require("../services/boardService");
 const rooms = require("../store/roomStore");
 
@@ -36,9 +41,9 @@ function registerRoomHandlers(io, socket) {
     }
   };
 
-  socket.on("createRoom", () => {
+  socket.on("createRoom", (playerSettings = {}) => {
     try {
-      const room = createRoom(socket.id);
+      const room = createRoom(socket.id, playerSettings);
       socket.join(room.code);
       socket.emit("roomCreated", {
         code: room.code,
@@ -49,9 +54,11 @@ function registerRoomHandlers(io, socket) {
     }
   });
 
-  socket.on("joinRoom", (code) => {
+  socket.on("joinRoom", (payload = {}) => {
     try {
-      const room = joinRoom(code, socket.id);
+      const code = typeof payload === "string" ? payload : payload.code;
+      const playerSettings = typeof payload === "string" ? {} : payload.playerSettings;
+      const room = joinRoom(code, socket.id, playerSettings);
       socket.join(room.code);
 
       socket.emit("joinSuccess", {
@@ -70,6 +77,21 @@ function registerRoomHandlers(io, socket) {
 
   socket.on("leaveRoom", cleanupRoom);
   socket.on("disconnect", cleanupRoom);
+
+  socket.on("updatePlayerSettings", (playerSettings = {}) => {
+    try {
+      const room = updatePlayerSettings(socket.id, playerSettings);
+      if (!room) return;
+
+      io.to(room.code).emit("roomUpdate", {
+        code: room.code,
+        players: room.players,
+        hostId: room.hostId,
+      });
+    } catch (error) {
+      socket.emit("errorMessage", error.message);
+    }
+  });
 
   socket.on("toggleReady", () => {
     try {
