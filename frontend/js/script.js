@@ -22,6 +22,22 @@ let selectedPieceId = null;
 let invalidPieceId = null;
 let invalidMoveTimer = null;
 
+function getCurrentTheme() {
+  return localStorage.getItem('theme') || 'dark';
+}
+
+function setTheme(theme) {
+  localStorage.setItem('theme', theme);
+  const root = document.documentElement;
+  if (theme === 'light') {
+    root.classList.add('light-theme');
+  } else {
+    root.classList.remove('light-theme');
+  }
+}
+
+setTheme(getCurrentTheme());
+
 const boardPositions = {
   // RED outer sector
   "RD_4D": { x: 460.8, y: 568.0 }, "RD_4C": { x: 389.3, y: 604.5 },
@@ -259,6 +275,9 @@ content.addEventListener("submit", (e) => {
 
   savePlayerSettings(nextSettings);
 
+  const darkMode = formData.get("darkMode") === "on";
+  setTheme(darkMode ? 'dark' : 'light');
+
   if (gameState.roomCode) {
     socket.emit("updatePlayerSettings", getBackendPlayerSettings());
   }
@@ -373,6 +392,12 @@ function showSettings() {
         <input type="checkbox" name="showValidMoves"
           ${playerSettings.showValidMoves ? "checked" : ""}>
         <span>Highlight valid moves</span>
+      </label>
+
+      <label class="toggle-row">
+        <input type="checkbox" name="darkMode" id="darkModeToggle"
+          ${getCurrentTheme() === 'dark' ? 'checked' : ''}>
+        <span>Dark Mode</span>
       </label>
 
       <p id="settingsStatus" class="settings-status" aria-live="polite"></p>
