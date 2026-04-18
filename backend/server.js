@@ -17,7 +17,10 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-initializeSocket(io);
+const GameLog = require('./moveLog');
+const gameLogs = {};
+
+initializeSocket(io, gameLogs);
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

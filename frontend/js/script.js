@@ -162,6 +162,57 @@ socket.on("gameStarted", (data) => {
   showGame();
 });
 
+
+socket.on('gameLogUpdate', (events) => {
+  updateLogUI(events);
+});
+
+function formatLogText(event) {
+  const d = event.details || {};
+  if (event.type === 'move') {
+    let text = `${event.player} moved ${d.pieceId} from ${d.from} to ${d.to}`;
+    if (d.captured) {
+      text += ` capturing ${d.captured}`;
+    }
+    return text;
+  }
+
+  switch (event.type) {
+    case 'capture':
+      return `${event.player} captured ${d.capturedPiece} with ${d.pieceId} at ${d.position}`;
+    case 'promotion':
+      return `${event.player} promoted ${d.pieceId} from ${d.fromType} to ${d.toType} at ${d.position}`;
+    case 'turnSkip':
+      return `${event.player} skipped a turn${d.reason ? ` (${d.reason})` : ''}`;
+    case 'elimination':
+      return `${event.player} eliminated ${d.eliminatedPlayer}${d.reason ? ` (${d.reason})` : ''}`;
+    default:
+      return `${event.player} ${event.type}: ${JSON.stringify(d)}`;
+  }
+}
+
+function getPlayerColor(event) {
+  return event.playerColor
+    || gameState.players?.find(p => p.name === event.player)?.color
+    || DEFAULT_PLAYER_SETTINGS.color;
+}
+
+function updateLogUI(events) {
+  const container = document.getElementById('log-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  events.forEach((event) => {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.style.borderLeft = `4px solid ${getPlayerColor(event)}`;
+    entry.textContent = formatLogText(event);
+    container.appendChild(entry);
+  });
+
+  container.scrollTop = container.scrollHeight;
+}
+
 // Full state push after any server-side mutation (moves, captures, etc.)
 socket.on("gameState", (state) => {
   console.log("Game state received:", state);
@@ -712,6 +763,10 @@ async function showGame() {
     <div id="scoreboard"></div>
     <div id="moveFeedback" class="move-feedback"></div>
     <div id="boardContainer"></div>
+    <section id="move-log" class="move-log">
+      <h3>Move Log</h3>
+      <div id="log-container" class="log-container"></div>
+    </section>
     <button id="endBtn">End Game (Simulate)</button>
   `;
 
