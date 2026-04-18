@@ -724,7 +724,7 @@ function applyMove(gameState, playerId, pieceId, to) {
     gameState.pieceCounts = countPiecesByColor(gameState.pieces);
     piece.position = to;
     capturedCell = jump.over;
-    const eliminated = handleEliminations(gameState, victim.color);
+    const eliminated = handles(gameState, victim.color);
 
     if (!piece.king && PROMOTION_ZONES[playerColor].includes(to)) {
       piece.king = true;
