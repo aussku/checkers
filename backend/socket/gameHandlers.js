@@ -1,7 +1,9 @@
 const rooms = require("../store/roomStore");
 const { applyMove } = require("../services/boardService");
+const { advanceTurn } = require("../services/boardService");
+const GameLog = require("../moveLog");
 
-function registerGameHandlers(io, socket) {
+function registerGameHandlers(io, socket, gameLogs, turnTimers) {
   socket.on("requestGameState", () => {
     for (const [code, room] of rooms.entries()) {
       if (room.players.some(p => p.id === socket.id)) {
@@ -14,35 +16,104 @@ function registerGameHandlers(io, socket) {
   });
 
 socket.on("makeMove", ({ roomCode, pieceId, to }) => {
-  try {
-    console.log("makeMove received:", { roomCode, pieceId, to, playerId: socket.id });
-
-    const room = rooms.get(roomCode);
-    if (!room) throw new Error("Room not found");
-    if (!room.gameState) throw new Error("Game has not started");
-
-    const result = applyMove(room.gameState, socket.id, pieceId, to);
-    console.log("applyMove result:", result);
-
-    if (!result.ok) {
-        socket.emit("invalidMove", {
-          pieceId: result.pieceId || pieceId,
-          from: result.from || null,
-          to,
-          error: result.error,
-        });
-
-        socket.emit("errorMessage", result.error);
+    try {
+      const room = rooms.get(roomCode);
+      const result = applyMove(room.gameState, socket.id, pieceId, to);
+      
+      if (!result.ok) {
+        socket.emit("invalidMove", { error: result.error });
         return;
       }
 
-    console.log("Broadcasting updated gameState");
-    io.to(roomCode).emit("gameState", room.gameState);
-  } catch (error) {
-    console.error("makeMove error:", error);
-    socket.emit("errorMessage", error.message);
+      // Clear timer on successful move
+      if (turnTimers[roomCode]) {
+        clearTimeout(turnTimers[roomCode]);
+        delete turnTimers[roomCode];
+      }
+
+      const player = room.players.find(p => p.id === socket.id);
+      if (player) {
+        if (!gameLogs[roomCode]) gameLogs[roomCode] = new GameLog();
+
+        // Log move
+        const moveDetails = {
+          pieceId,
+          from: result.move.from,
+          to: result.move.to,
+          captured: result.move.captured || null
+        };
+        gameLogs[roomCode].addMove(player.name, moveDetails, player.color);
+
+        // Log capture if happened
+        if (result.move.captured) {
+          gameLogs[roomCode].addCapture(player.name, {
+            pieceId,
+            capturedPiece: result.move.captured,
+            position: result.move.to
+          }, player.color);
+        }
+
+        // Log promotion if happened
+        if (result.move.promoted) {
+          gameLogs[roomCode].addPromotion(player.name, {
+            pieceId,
+            fromType: 'pawn',
+            toType: 'king',
+            position: result.move.to
+          }, player.color);
+        }
+
+        // Log eliminations if happened
+        if (result.eliminated && result.eliminated.length > 0) {
+          result.eliminated.forEach(eliminatedRecord => {
+            const eliminatedPlayer = room.players.find(p => p.id === eliminatedRecord.playerId);
+            if (eliminatedPlayer) {
+              gameLogs[roomCode].addElimination(player.name, {
+                eliminatedPlayer: eliminatedPlayer.name,
+                reason: 'no pieces left'
+              }, player.color);
+            }
+          });
+        }
+
+        console.log("Logged move event", roomCode, player.name, moveDetails);
+        gameLogs[roomCode].broadcast(io, roomCode);
+      }
+
+      // Start timer for next player
+      startTurnTimer(io, roomCode, gameLogs, turnTimers);
+
+      io.to(roomCode).emit("gameState", room.gameState);
+    } catch (error) {
+      console.error("makeMove error:", error);
+      socket.emit("moveError", { error: error.message });
+    }
+  });
+
+  // Helper function to start timer
+  function startTurnTimer(io, roomCode, gameLogs, turnTimers) {
+    const room = rooms.get(roomCode);
+    if (!room || room.gameState.status !== "active") return;
+
+    turnTimers[roomCode] = setTimeout(() => {
+      // Skip turn
+      const currentPlayerId = room.gameState.currentTurn;
+      const currentPlayer = room.players.find(p => p.id === currentPlayerId);
+      if (currentPlayer) {
+        // Log turn skip
+        if (!gameLogs[roomCode]) gameLogs[roomCode] = new GameLog();
+        gameLogs[roomCode].addTurnSkip(currentPlayer.name, { reason: 'time limit exceeded' }, currentPlayer.color);
+        gameLogs[roomCode].broadcast(io, roomCode);
+
+        // Advance turn
+        advanceTurn(room.gameState);
+        io.to(roomCode).emit("gameState", room.gameState);
+
+        // Start timer for next player
+        startTurnTimer(io, roomCode, gameLogs, turnTimers);
+      }
+    }, 30000); // 30 seconds
   }
-});
 }
 
 module.exports = registerGameHandlers;

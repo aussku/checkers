@@ -457,7 +457,7 @@ function advanceTurn(gameState) {
   gameState.currentTurn = order[next];
 }
 
-function handleEliminations(gameState, affectedColor) {
+function handles(gameState, affectedColor) {
   const eliminated = [];
   const remainingPieces = gameState.pieceCounts[affectedColor];
   if (remainingPieces > 0) return eliminated;
@@ -724,7 +724,7 @@ function applyMove(gameState, playerId, pieceId, to) {
     gameState.pieceCounts = countPiecesByColor(gameState.pieces);
     piece.position = to;
     capturedCell = jump.over;
-    const eliminated = handleEliminations(gameState, victim.color);
+    const eliminated = handles(gameState, victim.color);
 
     if (!piece.king && PROMOTION_ZONES[playerColor].includes(to)) {
       piece.king = true;
@@ -780,11 +780,39 @@ function applyMove(gameState, playerId, pieceId, to) {
       promoted = true;
     }
 
+    const eliminated = [];
+    for (const color of ['blue', 'green', 'red']) {
+      if (gameState.pieceCounts[color] === 0) {
+        const playerIdToElim = getPlayerIdByColor(gameState, color);
+        if (playerIdToElim && !isPlayerEliminated(gameState, playerIdToElim)) {
+          const place = 3 - gameState.eliminatedPlayers.length;
+          const eliminationRecord = { playerId: playerIdToElim, color, place };
+          gameState.eliminatedPlayers.push(eliminationRecord);
+          gameState.rankings.push(eliminationRecord);
+          eliminated.push(eliminationRecord);
+
+          // Check for winner
+          const activePlayers = getActivePlayerIds(gameState);
+          if (activePlayers.length === 1) {
+            const winnerId = activePlayers[0];
+            const winnerColor = getPlayerColor(gameState, winnerId);
+            if (!gameState.rankings.some(entry => entry.playerId === winnerId)) {
+              gameState.rankings.unshift({ playerId: winnerId, color: winnerColor, place: 1 });
+            }
+            gameState.winner = winnerId;
+            gameState.status = "finished";
+            gameState.captureChain = null;
+            gameState.currentTurn = null;
+          }
+        }
+      }
+    }
+
     advanceTurn(gameState);
     return { 
       ok: true, 
       move: { pieceId, from, to, captured: null, promoted },
-      eliminated: [],
+      eliminated,
       rankings: gameState.rankings,
       winner: gameState.winner,
     };
@@ -811,5 +839,6 @@ module.exports = {
   getCaptureMoves,
   applyMove,
   getNeighbors,
-  getLine
+  getLine,
+  advanceTurn
 };
