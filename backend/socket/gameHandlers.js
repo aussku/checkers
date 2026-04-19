@@ -1,6 +1,5 @@
 const rooms = require("../store/roomStore");
-const { applyMove } = require("../services/boardService");
-const { advanceTurn } = require("../services/boardService");
+const { applyMove, advanceTurn, getLegalMovesForPiece } = require("../services/boardService");
 const GameLog = require("../moveLog");
 
 function registerGameHandlers(io, socket, gameLogs, turnTimers) {
@@ -15,7 +14,23 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
     }
   });
 
-socket.on("makeMove", ({ roomCode, pieceId, to }) => {
+  socket.on("requestValidMoves", ({ roomCode, pieceId } = {}) => {
+    try {
+      const room = rooms.get(roomCode);
+      if (!room?.gameState || !pieceId) {
+        socket.emit("validMoves", { pieceId, moves: [] });
+        return;
+      }
+
+      const moves = getLegalMovesForPiece(room.gameState, socket.id, pieceId);
+      socket.emit("validMoves", { pieceId, moves });
+    } catch (error) {
+      console.error("requestValidMoves error:", error);
+      socket.emit("validMoves", { pieceId, moves: [] });
+    }
+  });
+
+  socket.on("makeMove", ({ roomCode, pieceId, to }) => {
     try {
       const room = rooms.get(roomCode);
       const result = applyMove(room.gameState, socket.id, pieceId, to);

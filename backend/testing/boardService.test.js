@@ -3,6 +3,7 @@ const {
   initializeGameState,
   applyMove,
   getSimpleMoves,
+  getLegalMovesForPiece,
   getNeighbors,
   getLine,
   buildForwardDistances,
@@ -427,6 +428,48 @@ describe("boardService", () => {
     
     const result = applyMove(gameState, "player-4", "b1", "BD_2B");
     expect(result.error).toBe("Invalid piece or piece does not belong to you");
+  });
+
+  test("getLegalMovesForPiece returns capture destinations for the selected piece", () => {
+    const gameState = initializeGameState(players);
+    gameState.currentTurn = "player-1";
+    gameState.pieces = [
+      { id: "b1", color: "blue", position: "BD_1A", king: false },
+      { id: "g1", color: "green", position: "BD_2B", king: false },
+      { id: "r1", color: "red", position: "RD_1A", king: false }
+    ];
+    gameState.pieceCounts = { blue: 1, green: 1, red: 1 };
+
+    expect(getLegalMovesForPiece(gameState, "player-1", "b1")).toEqual(["BD_3C"]);
+  });
+
+  test("getLegalMovesForPiece returns no simple moves when another piece must capture", () => {
+    const gameState = initializeGameState(players);
+    gameState.currentTurn = "player-1";
+    gameState.pieces = [
+      { id: "b1", color: "blue", position: "BD_1A", king: false },
+      { id: "b2", color: "blue", position: "BD_4A", king: false },
+      { id: "g1", color: "green", position: "BD_2B", king: false },
+      { id: "r1", color: "red", position: "RD_1A", king: false }
+    ];
+    gameState.pieceCounts = { blue: 2, green: 1, red: 1 };
+
+    expect(getLegalMovesForPiece(gameState, "player-1", "b2")).toEqual([]);
+  });
+
+  test("getLegalMovesForPiece respects the active capture chain piece", () => {
+    const gameState = initializeGameState(players);
+    gameState.currentTurn = "player-1";
+    gameState.captureChain = { pieceId: "b1" };
+    gameState.pieces = [
+      { id: "b1", color: "blue", position: "BD_3C", king: false },
+      { id: "b2", color: "blue", position: "BD_4A", king: false },
+      { id: "g1", color: "green", position: "GD_1A", king: false },
+      { id: "r1", color: "red", position: "RD_1A", king: false }
+    ];
+    gameState.pieceCounts = { blue: 2, green: 1, red: 1 };
+
+    expect(getLegalMovesForPiece(gameState, "player-1", "b2")).toEqual([]);
   });
 
   test("getLine: successfully follows a multi-step straight path", () => {

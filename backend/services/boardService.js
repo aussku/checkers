@@ -598,6 +598,40 @@ function hasAnyCapture(gameState, color) {
     .some(p => getCaptureMoves(gameState, p).length > 0);
 }
 
+function getLegalMovesForPiece(gameState, playerId, pieceId) {
+  ensureGameStateMeta(gameState);
+
+  if (!gameState || gameState.status !== "active") {
+    return [];
+  }
+
+  if (gameState.currentTurn !== playerId) {
+    return [];
+  }
+
+  const piece = getPieceById(gameState, pieceId);
+  const playerColor = getPlayerColor(gameState, playerId);
+
+  if (!piece || piece.color !== playerColor) {
+    return [];
+  }
+
+  if (gameState.captureChain && gameState.captureChain.pieceId !== pieceId) {
+    return [];
+  }
+
+  const captureMoves = getCaptureMoves(gameState, piece).map(jump => jump.to);
+  if (captureMoves.length > 0) {
+    return captureMoves;
+  }
+
+  if (hasAnyCapture(gameState, playerColor)) {
+    return [];
+  }
+
+  return getSimpleMoves(gameState, piece);
+}
+
 // ---------------------------------------------------------------------------
 // Game initialisation
 // ---------------------------------------------------------------------------
@@ -837,6 +871,7 @@ module.exports = {
   getPlayerColor,
   getSimpleMoves,
   getCaptureMoves,
+  getLegalMovesForPiece,
   applyMove,
   getNeighbors,
   getLine,

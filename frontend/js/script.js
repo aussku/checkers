@@ -19,6 +19,7 @@ let playerSettings = loadPlayerSettings();
 // Board state is owned by the server. This is a local rendering copy only.
 let boardState = null;
 let selectedPieceId = null;
+let highlightedMoves = [];
 let invalidPieceId = null;
 let invalidMoveTimer = null;
 
@@ -221,11 +222,15 @@ socket.on("gameState", (state) => {
 
   if (selectedPieceId) {
     const stillExists = boardState.pieces.some(p => p.id === selectedPieceId);
-    if (!stillExists) selectedPieceId = null;
+    if (!stillExists) {
+      selectedPieceId = null;
+      highlightedMoves = [];
+    }
   }
 
   const svg = document.querySelector("#boardContainer svg");
   if (svg) {
+    syncMoveHighlights();
     renderCellTargets(svg);
     renderPieces(svg);
   }
@@ -260,6 +265,18 @@ socket.on("invalidMove", ({ pieceId, error }) => {
       renderPieces(currentSvg);
     }
   }, 450);
+});
+
+socket.on("validMoves", ({ pieceId, moves }) => {
+  if (pieceId !== selectedPieceId) return;
+
+  highlightedMoves = Array.isArray(moves) ? moves : [];
+
+  const svg = document.querySelector("#boardContainer svg");
+  if (svg) {
+    renderCellTargets(svg);
+    renderPieces(svg);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -321,7 +338,7 @@ content.addEventListener("submit", (e) => {
   const nextSettings = {
     name: (formData.get("playerName") || "").toString().trim(),
     color: (formData.get("playerColor") || DEFAULT_PLAYER_SETTINGS.color).toString(),
-    showValidMoves: formData.get("showValidMoves") === "off",
+    showValidMoves: formData.has("showValidMoves"),
   };
 
   savePlayerSettings(nextSettings);
@@ -331,6 +348,13 @@ content.addEventListener("submit", (e) => {
 
   if (gameState.roomCode) {
     socket.emit("updatePlayerSettings", getBackendPlayerSettings());
+  }
+
+  syncMoveHighlights();
+  const svg = document.querySelector("#boardContainer svg");
+  if (svg) {
+    renderCellTargets(svg);
+    renderPieces(svg);
   }
 
   const status = document.getElementById("settingsStatus");
@@ -536,6 +560,23 @@ function getPieceAtPosition(position) {
   return boardState.pieces.find(p => p.position === position) || null;
 }
 
+function shouldShowMoveHighlights() {
+  return !!playerSettings.showValidMoves && !!selectedPieceId && isMyTurn();
+}
+
+function syncMoveHighlights() {
+  if (!shouldShowMoveHighlights()) {
+    highlightedMoves = [];
+    return;
+  }
+
+  highlightedMoves = [];
+  socket.emit("requestValidMoves", {
+    roomCode: gameState.roomCode,
+    pieceId: selectedPieceId,
+  });
+}
+
 function createPiece(svg, piece) {
   const pos = boardPositions[piece.position];
   if (!pos) return;
@@ -615,17 +656,33 @@ function handlePieceClick(pieceId, svg) {
 
   if (selectedPieceId === pieceId) {
     selectedPieceId = null;
+    highlightedMoves = [];
   } else {
     selectedPieceId = pieceId;
   }
 
+  syncMoveHighlights();
+  renderCellTargets(svg);
   renderPieces(svg);
 }
 
 function renderCellTargets(svg) {
-  svg.querySelectorAll(".board-cell-target").forEach(el => el.remove());
+  svg.querySelectorAll(".board-cell-target, .board-cell-highlight").forEach(el => el.remove());
 
   Object.entries(boardPositions).forEach(([position, pos]) => {
+    if (highlightedMoves.includes(position)) {
+      const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      ring.setAttribute("class", "board-cell-highlight");
+      ring.setAttribute("cx", pos.x);
+      ring.setAttribute("cy", pos.y);
+      ring.setAttribute("r", 11);
+      ring.setAttribute("fill", "rgba(255, 215, 0, 0.28)");
+      ring.setAttribute("stroke", "#ffd700");
+      ring.setAttribute("stroke-width", "3");
+      ring.setAttribute("pointer-events", "none");
+      svg.appendChild(ring);
+    }
+
     const target = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     target.setAttribute("class", "board-cell-target");
     target.setAttribute("cx", pos.x);
@@ -776,6 +833,7 @@ async function showGame() {
   document.getElementById("boardContainer").innerHTML = svgText;
 
   const svg = document.querySelector("#boardContainer svg");
+  syncMoveHighlights();
   renderCellTargets(svg);
   renderPieces(svg);
   renderScoreboard();
