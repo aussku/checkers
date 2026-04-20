@@ -198,8 +198,7 @@ const JUMP_GRAPH = {
     { over: "BD_2D", to: "BL_E3" }
   ],
   "BD_2B": [
-    { over: "BD_3C", to: "BD_4D" },
-    { over: "BD_1C", to: "BL_E1" }
+    { over: "BD_3C", to: "BD_4D" }
   ],
   "BD_2D": [
     { over: "BD_3C", to: "BD_4B" },
@@ -265,8 +264,7 @@ const JUMP_GRAPH = {
     { over: "GD_2D", to: "GL_E3" }
   ],
   "GD_2B": [
-    { over: "GD_3C", to: "GD_4D" },
-    { over: "GD_1C", to: "GL_E1" }
+    { over: "GD_3C", to: "GD_4D" }
   ],
   "GD_2D": [
     { over: "GD_3C", to: "GD_4B" },
@@ -332,8 +330,7 @@ const JUMP_GRAPH = {
     { over: "RD_2D", to: "RL_E3" }
   ],
   "RD_2B": [
-    { over: "RD_3C", to: "RD_4D" },
-    { over: "RD_1C", to: "RL_E1" }
+    { over: "RD_3C", to: "RD_4D" }
   ],
   "RD_2D": [
     { over: "RD_3C", to: "RD_4B" },
