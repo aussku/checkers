@@ -22,6 +22,7 @@ let selectedPieceId = null;
 let highlightedMoves = [];
 let invalidPieceId = null;
 let invalidMoveTimer = null;
+let lobbyAlert = null;
 
 function getCurrentTheme() {
   return localStorage.getItem('theme') || 'dark';
@@ -288,11 +289,8 @@ socket.on("rematchVoteUpdate", ({ acceptedCount, total }) => {
 
 socket.on("rematchDeclined", () => {
   if (boardState && boardState.status === "finished") {
-    alert("A player declined the rematch or disconnected. Returning to the lobby.");
     boardState = null; 
-    
-    gameState.players.forEach(p => p.ready = false);
-    renderLobby();
+    lobbyAlert = "A player declined or left. Rematch cancelled.";
   }
 });
 
@@ -525,6 +523,7 @@ function renderLobby() {
 
   content.style.display = "block";
   content.innerHTML = `
+    ${lobbyAlert ? `<div style="background: #e74c3c; color: white; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold;">${lobbyAlert}</div>` : ""}
     <h2>Game Lobby</h2>
     <div class="lobby-info">
       <p>Room Code: <strong style="color: #2ecc71;">${gameState.roomCode}</strong></p>
@@ -546,6 +545,8 @@ function renderLobby() {
     </button>
     <button id="backBtn">Leave Lobby</button>
   `;
+
+  lobbyAlert = null;
 }
 
 function joinGame() {
@@ -873,11 +874,24 @@ function showEndScreen() {
   const rankings = (boardState?.rankings || []).slice().sort((a, b) => a.place - b.place);
   const winner = rankings.find(entry => entry.place === 1);
   
+  const winnerName = winner ? escapeHtml(getPlayerLabel(winner.playerId)) : "Unknown";
+  const winnerColor = winner ? winner.color : "";
+  
   content.innerHTML = `
     <h2>Game Over</h2>
-    <p>Winner: ${winner ? escapeHtml(getPlayerLabel(winner.playerId)) : "Unknown"}</p>
-    <div class="final-rankings">
-      ${rankings.map(entry => `<p>${entry.place}. ${escapeHtml(getPlayerLabel(entry.playerId))}</p>`).join("")}
+    <p>Winner: <strong style="color: ${winnerColor};">${winnerName}</strong></p>
+    <div class="final-rankings" style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; margin: 15px 0;">
+      ${rankings.map(entry => {
+        const isMe = entry.playerId === socket.id;
+        const colorName = entry.color.charAt(0).toUpperCase() + entry.color.slice(1);
+        return `
+          <p style="font-size: 1.1rem; margin: 5px 0; color: ${entry.color};">
+            <strong>${entry.place}.</strong> ${escapeHtml(getPlayerLabel(entry.playerId))} 
+            <span style="opacity: 0.8; font-size: 0.9em;">(${colorName})</span>
+            ${isMe ? " <strong>(You)</strong>" : ""}
+          </p>
+        `;
+      }).join("")}
     </div>
     
     <div id="rematchContainer" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 8px;">
