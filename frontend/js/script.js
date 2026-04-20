@@ -279,6 +279,23 @@ socket.on("validMoves", ({ pieceId, moves }) => {
   }
 });
 
+socket.on("rematchVoteUpdate", ({ acceptedCount, total }) => {
+  const status = document.getElementById("rematchStatus");
+  if (status && status.textContent.includes("Waiting")) {
+    status.textContent = `Waiting for other players... (${acceptedCount}/${total} ready)`;
+  }
+});
+
+socket.on("rematchDeclined", () => {
+  if (boardState && boardState.status === "finished") {
+    alert("A player declined the rematch or disconnected. Returning to the lobby.");
+    boardState = null; 
+    
+    gameState.players.forEach(p => p.ready = false);
+    renderLobby();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // UI event routing
 // ---------------------------------------------------------------------------
@@ -327,6 +344,17 @@ content.addEventListener("click", (e) => {
     gameState.players = [];
     boardState = null;
     showMenu();
+  }
+
+  if (id === "acceptRematchBtn") {
+    socket.emit("voteRematch", true);
+    document.getElementById("acceptRematchBtn").style.display = "none";
+    document.getElementById("declineRematchBtn").style.display = "none";
+    document.getElementById("rematchStatus").textContent = "Waiting for other players...";
+  }
+
+  if (id === "declineRematchBtn") {
+    socket.emit("voteRematch", false);
   }
 });
 
@@ -844,13 +872,21 @@ function showEndScreen() {
   content.style.display = "block";
   const rankings = (boardState?.rankings || []).slice().sort((a, b) => a.place - b.place);
   const winner = rankings.find(entry => entry.place === 1);
+  
   content.innerHTML = `
     <h2>Game Over</h2>
     <p>Winner: ${winner ? escapeHtml(getPlayerLabel(winner.playerId)) : "Unknown"}</p>
     <div class="final-rankings">
       ${rankings.map(entry => `<p>${entry.place}. ${escapeHtml(getPlayerLabel(entry.playerId))}</p>`).join("")}
     </div>
-    <button id="menuBtn">Return to Menu</button>
+    
+    <div id="rematchContainer" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+      <p id="rematchStatus" style="margin-bottom: 15px; font-weight: bold;">Would you like a rematch?</p>
+      <button id="acceptRematchBtn" style="background: #2ecc71; color: white;">Accept Rematch</button>
+      <button id="declineRematchBtn" style="background: #e74c3c; color: white;">Decline</button>
+    </div>
+
+    <button id="menuBtn" style="margin-top: 20px;">Leave Room</button>
   `;
 }
 
