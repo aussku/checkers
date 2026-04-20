@@ -521,29 +521,16 @@ function getSimpleMoves(gameState, piece) {
         moves.add(neighbor);
       }
     } else {
-      // KINGS: Can move one step in any direction.
-      moves.add(neighbor);
+      // KINGS: Ray-cast sliding moves
+      const lines = getStraightLines(piece.position, neighbor);
 
-      // FIX (Bug 1): Kings can slide along straight lines (like a long-range
-      // king in international draughts). We extend step-by-step using
-      // JUMP_GRAPH to identify collinear cells. The loop continues as long as
-      // the next cell in the line is empty; it stops (without adding) when
-      // a piece blocks the path.
-      let prev = piece.position;
-      let curr = neighbor;
-      while (true) {
-        // Find the cell directly beyond `curr` in the same straight line
-        // by looking for a JUMP_GRAPH entry from `prev` that passes over `curr`.
-        const straightEntry = (JUMP_GRAPH[prev] || []).find(j => j.over === curr);
-        if (!straightEntry) break; // No further cell in this direction.
-
-        const nextCell = straightEntry.to;
-        if (getPieceAtPosition(gameState, nextCell)) break; // Blocked — stop here.
-
-        moves.add(nextCell);
-        prev = curr;
-        curr = nextCell;
-      }
+      lines.forEach(line => {
+        for (let i = 0; i < line.length; i++) {
+          const currentCell = line[i];
+          if (getPieceAtPosition(gameState, currentCell)) break; // Blocked — stop this ray
+          moves.add(currentCell);
+        }
+      });
     }
   });
   return Array.from(moves);
@@ -551,41 +538,54 @@ function getSimpleMoves(gameState, piece) {
 
 function getCaptureMoves(gameState, piece) {
   const captures = [];
-  const jumps = JUMP_GRAPH[piece.position] || [];
 
-  jumps.forEach(jump => {
-    const victim = getPieceAtPosition(gameState, jump.over);
-    const landing = getPieceAtPosition(gameState, jump.to);
+  if (!piece.king) {
+    // PAWNS: Only adjacent jumps
+    const jumps = JUMP_GRAPH[piece.position] || [];
+    jumps.forEach(jump => {
+      const victim = getPieceAtPosition(gameState, jump.over);
+      const landing = getPieceAtPosition(gameState, jump.to);
 
-    if (victim && victim.color !== piece.color && !landing) {
-      captures.push(jump);
-
-      // FIX (Bug 2): Flying king post-jump extension. After landing at jump.to,
-      // we continue along the same straight line. The next step searches
-      // JUMP_GRAPH[jump.over] for an entry whose `over` is `jump.to`, giving
-      // us the cell directly beyond `jump.to` on the same diagonal. This was
-      // previously searching from `currOver` for `j.over === currTo`, which
-      // pivots at the wrong cell (the captured piece rather than the landing).
-      if (piece.king) {
-        let prevOver = jump.over;
-        let currTo   = jump.to;
-        while (true) {
-          // The cell beyond `currTo` in the same line: look in JUMP_GRAPH
-          // from `prevOver` for a jump whose `over` is `currTo`.
-          // That entry's `to` is the next cell on the ray.
-          const extension = (JUMP_GRAPH[prevOver] || []).find(j => j.over === currTo);
-          if (!extension) break; // End of the line.
-
-          const nextLanding = extension.to;
-          if (getPieceAtPosition(gameState, nextLanding)) break; // Cell occupied.
-
-          captures.push({ over: jump.over, to: nextLanding });
-          prevOver = currTo;
-          currTo   = nextLanding;
-        }
+      if (victim && victim.color !== piece.color && !landing) {
+        captures.push(jump);
       }
-    }
-  });
+    });
+  } else {
+    // KINGS: Flying captures via branched ray-casting
+    const neighbors = MOVEMENT_GRAPH[piece.position] || [];
+
+    neighbors.forEach(neighbor => {
+      const lines = getStraightLines(piece.position, neighbor);
+
+      lines.forEach(line => {
+        let victim = null;
+
+        for (let i = 0; i < line.length; i++) {
+          const currentCell = line[i];
+          const occupant = getPieceAtPosition(gameState, currentCell);
+
+          if (!victim) {
+            // 1. Sliding forward, looking for an opponent
+            if (occupant) {
+              if (occupant.color === piece.color) {
+                break; // Blocked by our own piece
+              } else {
+                victim = occupant; // Target acquired!
+              }
+            }
+          } else {
+            // 2. We found a victim, looking for empty landing spots
+            if (occupant) {
+              break; // Hit another piece, jump sequence blocked
+            } else {
+              captures.push({ over: victim.position, to: currentCell });
+            }
+          }
+        }
+      });
+    });
+  }
+
   return captures;
 }
 
@@ -688,22 +688,26 @@ function initializeGameState(players) {
 // Move application
 // ---------------------------------------------------------------------------
 
-function getLine(startCell, firstStep) {
-  const line = [firstStep];
-  let prev = startCell;
-  let curr = firstStep;
+function getStraightLines(startCell, firstStep) {
+  const lines = [];
 
-  while (true) {
-    const straightPath = JUMP_GRAPH[prev]?.find(j => j.over === curr);
-    if (straightPath) {
-      line.push(straightPath.to);
-      prev = curr;
-      curr = straightPath.to;
+  function traverse(prev, curr, currentLine) {
+    currentLine.push(curr);
+
+    // Filter instead of find, so we get ALL branches (crucial for the hub fork)
+    const continuations = (JUMP_GRAPH[prev] || []).filter(j => j.over === curr);
+
+    if (continuations.length === 0) {
+      lines.push(currentLine);
     } else {
-      break;
+      for (const next of continuations) {
+        traverse(curr, next.to, [...currentLine]);
+      }
     }
   }
-  return line;
+
+  traverse(startCell, firstStep, []);
+  return lines;
 }
 
 function applyMove(gameState, playerId, pieceId, to) {
@@ -871,6 +875,6 @@ module.exports = {
   getLegalMovesForPiece,
   applyMove,
   getNeighbors,
-  getLine,
+  getStraightLines,
   advanceTurn
 };
