@@ -109,7 +109,7 @@ h1{
 
 #content{
   display: none;
-  width: min(900px, 95vw);
+  width: min(1280px, 96vw);
   margin-top: 18px;
   padding: 18px;
   min-height: 180px;
@@ -288,13 +288,144 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
   width: 100%;
   display: flex;
   justify-content: center;
-  margin-top: 2px;
+  margin-top: -20px;
 }
 
 #boardContainer svg {
-  width: min(700px, 100%);
+  width: min(760px, 100%);
   height: auto;
   display: block;
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(300px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.game-main-panel,
+.game-sidebar {
+  min-width: 0;
+}
+
+.game-main-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.game-sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.sidebar-panel,
+.chat-panel,
+.end-screen-panel,
+.final-rankings,
+.rematch-panel {
+  background: linear-gradient(180deg, rgba(15, 42, 28, 0.92), rgba(8, 20, 14, 0.88));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.22);
+}
+
+.chat-panel,
+.sidebar-panel {
+  padding: 14px;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sidebar-section-header h3 {
+  margin: 0;
+  color: var(--text);
+}
+
+.sidebar-section-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+}
+
+.chat-messages {
+  flex: 1;
+  min-height: 220px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-message {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.chat-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.chat-sender {
+  font-weight: 800;
+}
+
+.chat-timestamp {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.78rem;
+}
+
+.chat-text,
+.chat-empty {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.chat-empty {
+  color: rgba(255,255,255,0.68);
+  font-style: italic;
+}
+
+.chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.chat-form button,
+.game-actions button {
+  margin: 0;
+}
+
+.game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.end-screen-panel {
+  padding: 18px;
 }
 
 #turnIndicator {
@@ -434,18 +565,13 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
 }
 
 .move-log {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  background: rgba(0,0,0,0.05);
+  margin-top: 0;
 }
 
 #log-container {
-  max-height: 240px;
+  max-height: 260px;
   overflow-y: auto;
   padding-right: 0.25rem;
-  margin-top: 0.5rem;
 }
 
 .log-entry {
@@ -463,4 +589,29 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
   color: #999;
   font-size: 0.85rem;
   min-width: 4.5rem;
+}
+
+.final-rankings,
+.rematch-panel {
+  padding: 15px;
+  margin-top: 16px;
+}
+
+#rematchStatus {
+  margin: 0 0 15px;
+  font-weight: 700;
+}
+
+@media (max-width: 1080px) {
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-panel {
+    min-height: 320px;
+  }
+
+  .chat-messages {
+    max-height: 280px;
+  }
 }
