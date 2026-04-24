@@ -22,6 +22,7 @@ let selectedPieceId = null;
 let highlightedMoves = [];
 let invalidPieceId = null;
 let invalidMoveTimer = null;
+let lobbyAlert = null;
 
 function getCurrentTheme() {
   return localStorage.getItem('theme') || 'dark';
@@ -279,6 +280,20 @@ socket.on("validMoves", ({ pieceId, moves }) => {
   }
 });
 
+socket.on("rematchVoteUpdate", ({ acceptedCount, total }) => {
+  const status = document.getElementById("rematchStatus");
+  if (status && status.textContent.includes("Waiting")) {
+    status.textContent = `Waiting for other players... (${acceptedCount}/${total} ready)`;
+  }
+});
+
+socket.on("rematchDeclined", () => {
+  if (boardState && boardState.status === "finished") {
+    boardState = null; 
+    lobbyAlert = "A player declined or left. Rematch cancelled.";
+  }
+});
+
 // ---------------------------------------------------------------------------
 // UI event routing
 // ---------------------------------------------------------------------------
@@ -327,6 +342,17 @@ content.addEventListener("click", (e) => {
     gameState.players = [];
     boardState = null;
     showMenu();
+  }
+
+  if (id === "acceptRematchBtn") {
+    socket.emit("voteRematch", true);
+    document.getElementById("acceptRematchBtn").style.display = "none";
+    document.getElementById("declineRematchBtn").style.display = "none";
+    document.getElementById("rematchStatus").textContent = "Waiting for other players...";
+  }
+
+  if (id === "declineRematchBtn") {
+    socket.emit("voteRematch", false);
   }
 });
 
@@ -497,6 +523,7 @@ function renderLobby() {
 
   content.style.display = "block";
   content.innerHTML = `
+    ${lobbyAlert ? `<div style="background: #e74c3c; color: white; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold;">${lobbyAlert}</div>` : ""}
     <h2>Game Lobby</h2>
     <div class="lobby-info">
       <p>Room Code: <strong style="color: #2ecc71;">${gameState.roomCode}</strong></p>
@@ -518,6 +545,8 @@ function renderLobby() {
     </button>
     <button id="backBtn">Leave Lobby</button>
   `;
+
+  lobbyAlert = null;
 }
 
 function joinGame() {
@@ -844,13 +873,34 @@ function showEndScreen() {
   content.style.display = "block";
   const rankings = (boardState?.rankings || []).slice().sort((a, b) => a.place - b.place);
   const winner = rankings.find(entry => entry.place === 1);
+  
+  const winnerName = winner ? escapeHtml(getPlayerLabel(winner.playerId)) : "Unknown";
+  const winnerColor = winner ? winner.color : "";
+  
   content.innerHTML = `
     <h2>Game Over</h2>
-    <p>Winner: ${winner ? escapeHtml(getPlayerLabel(winner.playerId)) : "Unknown"}</p>
-    <div class="final-rankings">
-      ${rankings.map(entry => `<p>${entry.place}. ${escapeHtml(getPlayerLabel(entry.playerId))}</p>`).join("")}
+    <p>Winner: <strong style="color: ${winnerColor};">${winnerName}</strong></p>
+    <div class="final-rankings" style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; margin: 15px 0;">
+      ${rankings.map(entry => {
+        const isMe = entry.playerId === socket.id;
+        const colorName = entry.color.charAt(0).toUpperCase() + entry.color.slice(1);
+        return `
+          <p style="font-size: 1.1rem; margin: 5px 0; color: ${entry.color};">
+            <strong>${entry.place}.</strong> ${escapeHtml(getPlayerLabel(entry.playerId))} 
+            <span style="opacity: 0.8; font-size: 0.9em;">(${colorName})</span>
+            ${isMe ? " <strong>(You)</strong>" : ""}
+          </p>
+        `;
+      }).join("")}
     </div>
-    <button id="menuBtn">Return to Menu</button>
+    
+    <div id="rematchContainer" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+      <p id="rematchStatus" style="margin-bottom: 15px; font-weight: bold;">Would you like a rematch?</p>
+      <button id="acceptRematchBtn" style="background: #2ecc71; color: white;">Accept Rematch</button>
+      <button id="declineRematchBtn" style="background: #e74c3c; color: white;">Decline</button>
+    </div>
+
+    <button id="menuBtn" style="margin-top: 20px;">Leave Room</button>
   `;
 }
 

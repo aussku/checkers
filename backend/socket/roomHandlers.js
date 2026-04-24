@@ -8,11 +8,72 @@ const { initializeGameState } = require("../services/boardService");
 const rooms = require("../store/roomStore");
 
 function registerRoomHandlers(io, socket) {
+  socket.on("voteRematch", (accept) => {
+    let roomCode = null;
+    let currentRoom = null;
+    
+    for (const [code, room] of rooms.entries()) {
+      if (room.players.some(p => p.id === socket.id)) {
+        roomCode = code;
+        currentRoom = room;
+        break;
+      }
+    }
+
+    if (!currentRoom || currentRoom.gameState?.status !== "finished") return;
+
+    if (!currentRoom.rematchVotes) {
+      currentRoom.rematchVotes = new Set();
+    }
+
+    if (!accept) {
+      currentRoom.rematchVotes.clear();
+      currentRoom.players.forEach(p => p.ready = false);
+      delete currentRoom.gameState;
+
+      io.to(roomCode).emit("rematchDeclined");
+      
+      io.to(roomCode).emit("roomUpdate", {
+        code: roomCode,
+        players: currentRoom.players,
+        hostId: currentRoom.hostId,
+      });
+      return;
+    }
+
+    currentRoom.rematchVotes.add(socket.id);
+
+    io.to(roomCode).emit("rematchVoteUpdate", {
+      acceptedCount: currentRoom.rematchVotes.size,
+      total: currentRoom.players.length
+    });
+
+    if (currentRoom.rematchVotes.size === currentRoom.players.length && currentRoom.players.length > 0) {
+      currentRoom.rematchVotes.clear();
+      
+      currentRoom.gameState = initializeGameState(currentRoom.players);
+      
+      io.to(roomCode).emit("gameStarted", {
+        gameState: currentRoom.gameState,
+      });
+    }
+  });
+
+
   const cleanupRoom = () => {
     for (const [code, room] of rooms.entries()) {
       const playerIndex = room.players.findIndex(p => p.id === socket.id);
 
       if (playerIndex !== -1) {
+        if (room.gameState && room.gameState.status === "finished") {
+          if (room.rematchVotes) room.rematchVotes.clear();
+          
+          room.players.forEach(p => p.ready = false);
+          delete room.gameState;
+          
+          io.to(code).emit("rematchDeclined");
+        }
+
         room.players.splice(playerIndex, 1);
 
         if (room.countdownTimer) {

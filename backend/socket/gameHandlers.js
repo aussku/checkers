@@ -3,6 +3,36 @@ const { applyMove, advanceTurn, getLegalMovesForPiece } = require("../services/b
 const GameLog = require("../moveLog");
 
 function registerGameHandlers(io, socket, gameLogs, turnTimers) {
+  socket.on("debugEndGame", (roomCode) => {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState || room.gameState.status === "finished") return;
+
+    console.log(`[DEBUG] Force ending game for room ${roomCode}`);
+
+    // Force game over
+    room.gameState.status = "finished";
+    
+    // Generate mock rankings from the current players
+    room.gameState.rankings = room.players.map((p, index) => ({
+      playerId: p.id,
+      color: p.color,
+      place: index + 1
+    }));
+    
+    room.gameState.winner = room.gameState.rankings[0].playerId;
+    room.gameState.currentTurn = null;
+    room.gameState.captureChain = null;
+
+    // Clear any active turn timers
+    if (turnTimers[roomCode]) {
+      clearTimeout(turnTimers[roomCode]);
+      delete turnTimers[roomCode];
+    }
+
+    // Broadcast the finished state to all players
+    io.to(roomCode).emit("gameState", room.gameState);
+  });
+
   socket.on("requestGameState", () => {
     for (const [code, room] of rooms.entries()) {
       if (room.players.some(p => p.id === socket.id)) {
