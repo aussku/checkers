@@ -23,6 +23,8 @@ let highlightedMoves = [];
 let invalidPieceId = null;
 let invalidMoveTimer = null;
 let lobbyAlert = null;
+let chatMessages = [];
+let gameLogEvents = [];
 
 function getCurrentTheme() {
   return localStorage.getItem('theme') || 'dark';
@@ -161,11 +163,19 @@ socket.on("gameStarted", (data) => {
   if (overlay) overlay.remove();
 
   boardState = data.gameState;
+  chatMessages = Array.isArray(data.chatMessages) ? data.chatMessages : [];
+  gameLogEvents = [];
   showGame();
+});
+
+socket.on("chatMessage", (message) => {
+  chatMessages.push(message);
+  renderChatMessages();
 });
 
 
 socket.on('gameLogUpdate', (events) => {
+  gameLogEvents = Array.isArray(events) ? events : [];
   updateLogUI(events);
 });
 
@@ -354,37 +364,47 @@ content.addEventListener("click", (e) => {
   if (id === "declineRematchBtn") {
     socket.emit("voteRematch", false);
   }
+
+  if (id === "sendChatBtn") {
+    sendChatMessage();
+  }
 });
 
 content.addEventListener("submit", (e) => {
-  if (e.target.id !== "settingsForm") return;
-
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  const nextSettings = {
-    name: (formData.get("playerName") || "").toString().trim(),
-    color: (formData.get("playerColor") || DEFAULT_PLAYER_SETTINGS.color).toString(),
-    showValidMoves: formData.has("showValidMoves"),
-  };
-
-  savePlayerSettings(nextSettings);
-
-  const darkMode = formData.get("darkMode") === "on";
-  setTheme(darkMode ? 'dark' : 'light');
-
-  if (gameState.roomCode) {
-    socket.emit("updatePlayerSettings", getBackendPlayerSettings());
+  if (e.target.id === "chatForm") {
+    e.preventDefault();
+    sendChatMessage();
+    return;
   }
 
-  syncMoveHighlights();
-  const svg = document.querySelector("#boardContainer svg");
-  if (svg) {
-    renderCellTargets(svg);
-    renderPieces(svg);
-  }
+  if (e.target.id === "settingsForm") {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const nextSettings = {
+      name: (formData.get("playerName") || "").toString().trim(),
+      color: (formData.get("playerColor") || DEFAULT_PLAYER_SETTINGS.color).toString(),
+      showValidMoves: formData.has("showValidMoves"),
+    };
 
-  const status = document.getElementById("settingsStatus");
-  if (status) status.textContent = "Settings saved.";
+    savePlayerSettings(nextSettings);
+
+    const darkMode = formData.get("darkMode") === "on";
+    setTheme(darkMode ? 'dark' : 'light');
+
+    if (gameState.roomCode) {
+      socket.emit("updatePlayerSettings", getBackendPlayerSettings());
+    }
+
+    syncMoveHighlights();
+    const svg = document.querySelector("#boardContainer svg");
+    if (svg) {
+      renderCellTargets(svg);
+      renderPieces(svg);
+    }
+
+    const status = document.getElementById("settingsStatus");
+    if (status) status.textContent = "Settings saved.";
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -431,6 +451,82 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function formatChatTimestamp(timestamp) {
+  if (!timestamp) return "";
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getChatSidebarMarkup() {
+  return `
+    <aside class="game-sidebar">
+      <section class="chat-panel">
+        <div class="sidebar-section-header">
+          <h3>Game Chat</h3>
+          <span class="sidebar-section-meta">${chatMessages.length} message${chatMessages.length === 1 ? "" : "s"}</span>
+        </div>
+        <div id="chatMessages" class="chat-messages"></div>
+        <form id="chatForm" class="chat-form">
+          <input id="chatInput" name="chatInput" type="text" maxlength="240" placeholder="Type a message..." autocomplete="off">
+          <button id="sendChatBtn" type="submit">Send</button>
+        </form>
+      </section>
+      <section id="move-log" class="move-log sidebar-panel">
+        <div class="sidebar-section-header">
+          <h3>Move Log</h3>
+        </div>
+        <div id="log-container" class="log-container"></div>
+      </section>
+    </aside>
+  `;
+}
+
+function renderChatMessages() {
+  const container = document.getElementById("chatMessages");
+  if (!container) return;
+
+  if (!chatMessages.length) {
+    container.innerHTML = `<p class="chat-empty">No messages yet. Say hello to the room.</p>`;
+  } else {
+    container.innerHTML = chatMessages.map((message) => `
+      <article class="chat-message">
+        <div class="chat-message-meta">
+          <span class="chat-sender" style="color: ${escapeHtml(message.playerColor || DEFAULT_PLAYER_SETTINGS.color)};">
+            ${escapeHtml(message.playerName || "Player")}
+          </span>
+          <span class="chat-timestamp">${escapeHtml(formatChatTimestamp(message.timestamp))}</span>
+        </div>
+        <p class="chat-text">${escapeHtml(message.text || "")}</p>
+      </article>
+    `).join("");
+  }
+
+  const meta = document.querySelector(".chat-panel .sidebar-section-meta");
+  if (meta) {
+    meta.textContent = `${chatMessages.length} message${chatMessages.length === 1 ? "" : "s"}`;
+  }
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  if (!input) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+
+  socket.emit("sendChatMessage", { text });
+  input.value = "";
+  input.focus();
 }
 
 function showMenu() {
@@ -842,18 +938,21 @@ function updateTurnDisplay() {
 async function showGame() {
   content.style.display = "block";
   content.innerHTML = `
-    <h2>Game Started</h2>
-    <div id="turnIndicator">
-      <span id="turnText">Waiting for turn info...</span>
+    <div class="game-layout">
+      <section class="game-main-panel">
+        <h2>Game Started</h2>
+        <div id="turnIndicator">
+          <span id="turnText">Waiting for turn info...</span>
+        </div>
+        <div id="scoreboard"></div>
+        <div id="moveFeedback" class="move-feedback"></div>
+        <div id="boardContainer"></div>
+        <div class="game-actions">
+          <button id="endBtn">End Game (Simulate)</button>
+        </div>
+      </section>
+      ${getChatSidebarMarkup()}
     </div>
-    <div id="scoreboard"></div>
-    <div id="moveFeedback" class="move-feedback"></div>
-    <div id="boardContainer"></div>
-    <section id="move-log" class="move-log">
-      <h3>Move Log</h3>
-      <div id="log-container" class="log-container"></div>
-    </section>
-    <button id="endBtn">End Game (Simulate)</button>
   `;
 
   const response = await fetch("./assets/board.svg");
@@ -867,6 +966,8 @@ async function showGame() {
   renderPieces(svg);
   renderScoreboard();
   updateTurnDisplay();
+  renderChatMessages();
+  updateLogUI(gameLogEvents);
 }
 
 function showEndScreen() {
@@ -878,29 +979,39 @@ function showEndScreen() {
   const winnerColor = winner ? winner.color : "";
   
   content.innerHTML = `
-    <h2>Game Over</h2>
-    <p>Winner: <strong style="color: ${winnerColor};">${winnerName}</strong></p>
-    <div class="final-rankings" style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; margin: 15px 0;">
-      ${rankings.map(entry => {
-        const isMe = entry.playerId === socket.id;
-        const colorName = entry.color.charAt(0).toUpperCase() + entry.color.slice(1);
-        return `
-          <p style="font-size: 1.1rem; margin: 5px 0; color: ${entry.color};">
-            <strong>${entry.place}.</strong> ${escapeHtml(getPlayerLabel(entry.playerId))} 
-            <span style="opacity: 0.8; font-size: 0.9em;">(${colorName})</span>
-            ${isMe ? " <strong>(You)</strong>" : ""}
-          </p>
-        `;
-      }).join("")}
+    <div class="game-layout game-layout-end">
+      <section class="game-main-panel end-screen-panel">
+        <h2>Game Over</h2>
+        <p>Winner: <strong style="color: ${winnerColor};">${winnerName}</strong></p>
+        <div class="final-rankings">
+          ${rankings.map(entry => {
+            const isMe = entry.playerId === socket.id;
+            const colorName = entry.color.charAt(0).toUpperCase() + entry.color.slice(1);
+            return `
+              <p style="font-size: 1.1rem; margin: 5px 0; color: ${entry.color};">
+                <strong>${entry.place}.</strong> ${escapeHtml(getPlayerLabel(entry.playerId))}
+                <span style="opacity: 0.8; font-size: 0.9em;">(${colorName})</span>
+                ${isMe ? " <strong>(You)</strong>" : ""}
+              </p>
+            `;
+          }).join("")}
+        </div>
+        <div id="rematchContainer" class="rematch-panel">
+          <p id="rematchStatus">Would you like a rematch?</p>
+          <div class="game-actions">
+            <button id="acceptRematchBtn" style="background: #2ecc71; color: white;">Accept Rematch</button>
+            <button id="declineRematchBtn" style="background: #e74c3c; color: white;">Decline</button>
+          </div>
+        </div>
+        <div class="game-actions">
+          <button id="menuBtn">Leave Room</button>
+        </div>
+      </section>
+      ${getChatSidebarMarkup()}
     </div>
-    
-    <div id="rematchContainer" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 8px;">
-      <p id="rematchStatus" style="margin-bottom: 15px; font-weight: bold;">Would you like a rematch?</p>
-      <button id="acceptRematchBtn" style="background: #2ecc71; color: white;">Accept Rematch</button>
-      <button id="declineRematchBtn" style="background: #e74c3c; color: white;">Decline</button>
-    </div>
-
-    <button id="menuBtn" style="margin-top: 20px;">Leave Room</button>
   `;
+
+  renderChatMessages();
+  updateLogUI(gameLogEvents);
 }
 

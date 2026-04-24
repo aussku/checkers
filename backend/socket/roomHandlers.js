@@ -51,10 +51,12 @@ function registerRoomHandlers(io, socket) {
     if (currentRoom.rematchVotes.size === currentRoom.players.length && currentRoom.players.length > 0) {
       currentRoom.rematchVotes.clear();
       
+      currentRoom.chatMessages = [];
       currentRoom.gameState = initializeGameState(currentRoom.players);
       
       io.to(roomCode).emit("gameStarted", {
         gameState: currentRoom.gameState,
+        chatMessages: currentRoom.chatMessages,
       });
     }
   });
@@ -181,10 +183,12 @@ function registerRoomHandlers(io, socket) {
         room.countdownTimer = setTimeout(() => {
           if (!rooms.has(room.code)) return;
 
+          room.chatMessages = [];
           room.gameState = initializeGameState(room.players);
 
           io.to(room.code).emit("gameStarted", {
             gameState: room.gameState,
+            chatMessages: room.chatMessages,
           });
         }, 3000);
       } else {

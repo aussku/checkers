@@ -69,6 +69,7 @@ function createRoom(hostId, playerSettings = {}) {
     hostId,
     players: [createPlayer(hostId, playerSettings, "Player 1")],
     maxPlayers: 3,
+    chatMessages: [],
     countdownTimer: null,
     createdAt: new Date(),
   };

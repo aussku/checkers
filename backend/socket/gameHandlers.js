@@ -3,6 +3,38 @@ const { applyMove, advanceTurn, getLegalMovesForPiece } = require("../services/b
 const GameLog = require("../moveLog");
 
 function registerGameHandlers(io, socket, gameLogs, turnTimers) {
+  socket.on("sendChatMessage", ({ text } = {}) => {
+    try {
+      const trimmedText = typeof text === "string" ? text.trim() : "";
+      if (!trimmedText) return;
+
+      for (const [roomCode, room] of rooms.entries()) {
+        const player = room.players.find(p => p.id === socket.id);
+        if (!player) continue;
+
+        const message = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          playerId: player.id,
+          playerName: player.name,
+          playerColor: player.color,
+          text: trimmedText.slice(0, 240),
+          timestamp: new Date().toISOString(),
+        };
+
+        if (!Array.isArray(room.chatMessages)) {
+          room.chatMessages = [];
+        }
+
+        room.chatMessages.push(message);
+        io.to(roomCode).emit("chatMessage", message);
+        return;
+      }
+    } catch (error) {
+      console.error("sendChatMessage error:", error);
+      socket.emit("errorMessage", "Unable to send chat message.");
+    }
+  });
+
   socket.on("debugEndGame", (roomCode) => {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState || room.gameState.status === "finished") return;
