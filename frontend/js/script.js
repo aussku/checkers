@@ -2,10 +2,16 @@ const content = document.getElementById("content");
 const menu = document.getElementById("menu");
 const socket = io();
 
+let countdownActive = false;
+
 let gameState = {
   isHost: false,
   players: [],
   roomCode: null,
+  gameSettings: {
+    turnTimeLimit: 0,
+    forcedCaptures: false,
+  },
 };
 
 const DEFAULT_PLAYER_SETTINGS = {
@@ -115,6 +121,7 @@ socket.on("roomUpdate", (data) => {
   if (gameState.roomCode) {
     gameState.players = data.players;
     if (data.hostId === socket.id) gameState.isHost = true;
+    if (data.gameSettings) gameState.gameSettings = data.gameSettings;
     renderLobby();
   }
 });
@@ -127,6 +134,8 @@ socket.on("joinSuccess", (data) => {
 });
 
 socket.on("startCountdown", (seconds) => {
+  countdownActive = true;
+  renderLobby();
   let timeLeft = seconds;
   const timerDisplay = document.createElement("div");
   timerDisplay.id = "countdown-overlay";
@@ -145,8 +154,10 @@ socket.on("startCountdown", (seconds) => {
 });
 
 socket.on("cancelCountdown", () => {
+  countdownActive = false;
   const overlay = document.getElementById("countdown-overlay");
   if (overlay) overlay.remove();
+  renderLobby();
 });
 
 // ---------------------------------------------------------------------------
@@ -415,10 +426,36 @@ function renderLobby() {
   const playerCount = gameState.players.length;
   const playersNeeded = 3 - playerCount;
   const me = gameState.players.find(p => p.id === socket.id);
+  const isHost = gameState.isHost;
+  const settings = gameState.gameSettings;
 
   const statusMessage = playerCount < 3
     ? `Waiting for ${playersNeeded} more player${playersNeeded > 1 ? "s" : ""}...`
     : "Ready to begin!";
+
+  const timeOptions = [0, 15, 30, 60, 90, 120];
+
+  const settingsHTML = `
+    <div class="game-settings-panel">
+      <h3>Game Settings ${isHost ? "" : "<span class='host-only-label'>(Host only)</span>"}</h3>
+      <label class="settings-row">
+        <span>Turn Time Limit</span>
+        <select id="timeLimitSelect" ${isHost && !countdownActive ? "" : "disabled"}>
+          ${timeOptions.map(t => `
+            <option value="${t}" ${settings.turnTimeLimit === t ? "selected" : ""}>
+              ${t === 0 ? "No limit" : `${t}s`}
+            </option>
+          `).join("")}
+        </select>
+      </label>
+      <label class="settings-row">
+        <span>Forced Captures</span>
+        <input type="checkbox" id="forcedCapturesCheck"
+          ${settings.forcedCaptures ? "checked" : ""}
+          ${isHost && !countdownActive ? "" : "disabled"}>
+      </label>
+    </div>
+  `;
 
   content.style.display = "block";
   content.innerHTML = `
@@ -438,11 +475,28 @@ function renderLobby() {
         </li>
       `).join("")}
     </ul>
+    ${settingsHTML}
     <button id="readyBtn" class="${me.ready ? "active" : ""}">
       ${me.ready ? "Unready" : "Ready Up"}
     </button>
     <button id="backBtn">Leave Lobby</button>
   `;
+
+  if (isHost && !countdownActive) {
+    document.getElementById("timeLimitSelect").addEventListener("change", (e) => {
+      socket.emit("updateGameSettings", {
+        turnTimeLimit: Number(e.target.value),
+        forcedCaptures: document.getElementById("forcedCapturesCheck").checked,
+      });
+    });
+
+    document.getElementById("forcedCapturesCheck").addEventListener("change", (e) => {
+      socket.emit("updateGameSettings", {
+        turnTimeLimit: Number(document.getElementById("timeLimitSelect").value),
+        forcedCaptures: e.target.checked,
+      });
+    });
+  }
 }
 
 function joinGame() {
