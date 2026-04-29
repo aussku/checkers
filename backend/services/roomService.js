@@ -72,6 +72,10 @@ function createRoom(hostId, playerSettings = {}) {
     chatMessages: [],
     countdownTimer: null,
     createdAt: new Date(),
+    gameSettings: {
+      turnTimeLimit: 0,
+      forcedCaptures: false,
+    },
   };
 
   rooms.set(code, room);
@@ -140,6 +144,21 @@ function toggleReady(roomCode, playerId) {
   return { room, allReady };
 }
 
+function updateGameSettings(code, hostId, settings = {}) {
+  const room = getRoomByCode(code);
+  if (!room) throw new Error("Room not found");
+  if (room.hostId !== hostId) throw new Error("Only the host can change settings");
+  if (room.gameState) throw new Error("Cannot change settings after game has started");
+
+  const turnTimeLimit = Number(settings.turnTimeLimit);
+  room.gameSettings = {
+    turnTimeLimit: Number.isFinite(turnTimeLimit) && turnTimeLimit >= 0 ? turnTimeLimit : 0,
+    forcedCaptures: settings.forcedCaptures === true,
+  };
+
+  return room;
+}
+
 module.exports = {
   createRoom,
   joinRoom,
@@ -147,4 +166,5 @@ module.exports = {
   toggleReady,
   updatePlayerSettings,
   sanitizePlayerSettings,
+  updateGameSettings,
 };

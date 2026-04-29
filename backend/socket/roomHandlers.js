@@ -3,6 +3,7 @@ const {
   joinRoom,
   toggleReady,
   updatePlayerSettings,
+  updateGameSettings,
 } = require("../services/roomService");
 const { initializeGameState } = require("../services/boardService");
 const rooms = require("../store/roomStore");
@@ -37,6 +38,7 @@ function registerRoomHandlers(io, socket) {
         code: roomCode,
         players: currentRoom.players,
         hostId: currentRoom.hostId,
+        gameSettings: currentRoom.gameSettings,
       });
       return;
     }
@@ -95,6 +97,7 @@ function registerRoomHandlers(io, socket) {
             code,
             players: room.players,
             hostId: room.hostId,
+            gameSettings: room.gameSettings,
           });
         }
 
@@ -132,6 +135,8 @@ function registerRoomHandlers(io, socket) {
       io.to(room.code).emit("roomUpdate", {
         code: room.code,
         players: room.players,
+        hostId: room.hostId,
+        gameSettings: room.gameSettings,
       });
     } catch (error) {
       socket.emit("errorMessage", error.message);
@@ -150,6 +155,7 @@ function registerRoomHandlers(io, socket) {
         code: room.code,
         players: room.players,
         hostId: room.hostId,
+        gameSettings: room.gameSettings,
       });
     } catch (error) {
       socket.emit("errorMessage", error.message);
@@ -174,6 +180,7 @@ function registerRoomHandlers(io, socket) {
         code: room.code,
         players: room.players,
         hostId: room.hostId,
+        gameSettings: room.gameSettings,
       });
 
       if (allReady) {
@@ -198,6 +205,30 @@ function registerRoomHandlers(io, socket) {
           io.to(room.code).emit("cancelCountdown");
         }
       }
+    } catch (error) {
+      socket.emit("errorMessage", error.message);
+    }
+  });
+  socket.on("updateGameSettings", (settings = {}) => {
+    try {
+      let roomCode = null;
+      for (const [code, room] of rooms.entries()) {
+        if (room.hostId === socket.id) {
+          roomCode = code;
+          break;
+        }
+      }
+
+      if (!roomCode) throw new Error("Room not found");
+
+      const room = updateGameSettings(roomCode, socket.id, settings);
+
+      io.to(room.code).emit("roomUpdate", {
+        code: room.code,
+        players: room.players,
+        hostId: room.hostId,
+        gameSettings: room.gameSettings,
+      });
     } catch (error) {
       socket.emit("errorMessage", error.message);
     }
