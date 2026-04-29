@@ -615,3 +615,66 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
     max-height: 280px;
   }
 }
+
+.game-settings-panel {
+  margin: 14px 0;
+  padding: 14px 16px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.game-settings-panel h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+.host-only-label {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings-row select {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-row select:disabled,
+.settings-row input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--red);
+  cursor: pointer;
+}
