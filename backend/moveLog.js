@@ -1,4 +1,4 @@
-const LogEvent = require('./logEvent');
+const LogEvent = require('./LogEvent');
 
 class GameLog {
   constructor() {
