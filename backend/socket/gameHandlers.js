@@ -171,6 +171,9 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
   function startTurnTimer(io, roomCode, gameLogs, turnTimers) {
     const room = rooms.get(roomCode);
     if (!room || room.gameState.status !== "active") return;
+    
+    const limit = room.gameSettings?.turnTimeLimit;
+    if (!limit || limit <= 0) return;
 
     turnTimers[roomCode] = setTimeout(() => {
       // Skip turn
@@ -189,7 +192,7 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
         // Start timer for next player
         startTurnTimer(io, roomCode, gameLogs, turnTimers);
       }
-    }, 30000); // 30 seconds
+    }, limit * 1000); // 30 seconds
   }
 }
 
