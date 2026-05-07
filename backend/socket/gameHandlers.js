@@ -2,7 +2,7 @@ const rooms = require("../store/roomStore");
 const { applyMove, advanceTurn, getLegalMovesForPiece } = require("../services/boardService");
 const GameLog = require("../moveLog");
 
-function registerGameHandlers(io, socket, gameLogs, turnTimers) {
+function registerGameHandlers(io, socket, gameLogs, turnTimers, startTurnTimer) {
   socket.on("sendChatMessage", ({ text } = {}) => {
     try {
       const trimmedText = typeof text === "string" ? text.trim() : "";
@@ -57,8 +57,8 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
 
     // Clear any active turn timers
     if (turnTimers[roomCode]) {
-      clearTimeout(turnTimers[roomCode]);
-      delete turnTimers[roomCode];
+        clearInterval(turnTimers[roomCode]);
+        delete turnTimers[roomCode];
     }
 
     // Broadcast the finished state to all players
@@ -84,7 +84,7 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
         return;
       }
 
-      const moves = getLegalMovesForPiece(room.gameState, socket.id, pieceId);
+      const moves = getLegalMovesForPiece(room.gameState, socket.id, pieceId, room.gameSettings?.forcedCaptures ?? false);
       socket.emit("validMoves", { pieceId, moves });
     } catch (error) {
       console.error("requestValidMoves error:", error);
@@ -95,7 +95,7 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
   socket.on("makeMove", ({ roomCode, pieceId, to }) => {
     try {
       const room = rooms.get(roomCode);
-      const result = applyMove(room.gameState, socket.id, pieceId, to);
+      const result = applyMove(room.gameState, socket.id, pieceId, to, room.gameSettings?.forcedCaptures ?? false);
       
       if (!result.ok) {
         socket.emit("invalidMove", { error: result.error });
@@ -104,7 +104,7 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
 
       // Clear timer on successful move
       if (turnTimers[roomCode]) {
-        clearTimeout(turnTimers[roomCode]);
+        clearInterval(turnTimers[roomCode]);
         delete turnTimers[roomCode];
       }
 
@@ -166,34 +166,6 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers) {
       socket.emit("moveError", { error: error.message });
     }
   });
-
-  // Helper function to start timer
-  function startTurnTimer(io, roomCode, gameLogs, turnTimers) {
-    const room = rooms.get(roomCode);
-    if (!room || room.gameState.status !== "active") return;
-    
-    const limit = room.gameSettings?.turnTimeLimit;
-    if (!limit || limit <= 0) return;
-
-    turnTimers[roomCode] = setTimeout(() => {
-      // Skip turn
-      const currentPlayerId = room.gameState.currentTurn;
-      const currentPlayer = room.players.find(p => p.id === currentPlayerId);
-      if (currentPlayer) {
-        // Log turn skip
-        if (!gameLogs[roomCode]) gameLogs[roomCode] = new GameLog();
-        gameLogs[roomCode].addTurnSkip(currentPlayer.name, { reason: 'time limit exceeded' }, currentPlayer.color);
-        gameLogs[roomCode].broadcast(io, roomCode);
-
-        // Advance turn
-        advanceTurn(room.gameState);
-        io.to(roomCode).emit("gameState", room.gameState);
-
-        // Start timer for next player
-        startTurnTimer(io, roomCode, gameLogs, turnTimers);
-      }
-    }, limit * 1000); // 30 seconds
-  }
 }
 
 module.exports = registerGameHandlers;
