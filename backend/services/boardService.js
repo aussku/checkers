@@ -595,7 +595,7 @@ function hasAnyCapture(gameState, color) {
     .some(p => getCaptureMoves(gameState, p).length > 0);
 }
 
-function getLegalMovesForPiece(gameState, playerId, pieceId) {
+function getLegalMovesForPiece(gameState, playerId, pieceId, forcedCaptures = false) {
   ensureGameStateMeta(gameState);
 
   if (!gameState || gameState.status !== "active") {
@@ -622,7 +622,7 @@ function getLegalMovesForPiece(gameState, playerId, pieceId) {
     return captureMoves;
   }
 
-  if (hasAnyCapture(gameState, playerColor)) {
+  if (forcedCaptures && hasAnyCapture(gameState, playerColor)) {
     return [];
   }
 
@@ -710,7 +710,7 @@ function getStraightLines(startCell, firstStep) {
   return lines;
 }
 
-function applyMove(gameState, playerId, pieceId, to) {
+function applyMove(gameState, playerId, pieceId, to, forcedCaptures = false) {
   ensureGameStateMeta(gameState);
 
   // 1. Basic State & Turn Validation
@@ -802,7 +802,7 @@ function applyMove(gameState, playerId, pieceId, to) {
   // valid non-capture move after the chain is exhausted (a state that can't
   // occur, but the stale check created confusing logic). Only hasAnyCapture
   // is needed to enforce the mandatory-jump rule.
-  if (hasAnyCapture(gameState, playerColor)) {
+  if (forcedCaptures && hasAnyCapture(gameState, playerColor)) {
     return { ok: false, error: "Mandatory capture rule: You must perform a jump." };
   }
 

@@ -8,7 +8,7 @@ const {
 const { initializeGameState } = require("../services/boardService");
 const rooms = require("../store/roomStore");
 
-function registerRoomHandlers(io, socket) {
+function registerRoomHandlers(io, socket, turnTimers, gameLogs, startTurnTimer) {
   socket.on("voteRematch", (accept) => {
     let roomCode = null;
     let currentRoom = null;
@@ -60,6 +60,7 @@ function registerRoomHandlers(io, socket) {
         gameState: currentRoom.gameState,
         chatMessages: currentRoom.chatMessages,
       });
+      startTurnTimer(io, roomCode, gameLogs, turnTimers);
     }
   });
 
@@ -197,6 +198,7 @@ function registerRoomHandlers(io, socket) {
             gameState: room.gameState,
             chatMessages: room.chatMessages,
           });
+          startTurnTimer(io, room.code, gameLogs, turnTimers);
         }, 3000);
       } else {
         if (room.countdownTimer) {

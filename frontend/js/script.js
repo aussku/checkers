@@ -301,6 +301,28 @@ socket.on("validMoves", ({ pieceId, moves }) => {
   }
 });
 
+socket.on("turnTimerUpdate", ({ timeLeft }) => {
+  let timerEl = document.getElementById("turnTimer");
+  const indicator = document.getElementById("turnIndicator");
+  if (!indicator) return;
+
+  if (!timerEl) {
+    timerEl = document.createElement("div");
+    timerEl.id = "turnTimer";
+    timerEl.style.cssText = "text-align:center; font-size:1.1rem; font-weight:800; margin-top:6px;";
+    indicator.appendChild(timerEl);
+  }
+
+  timerEl.textContent = timeLeft <= 0 ? "Time's up!" : `⏱ ${timeLeft}s`;
+  timerEl.style.color = timeLeft <= 5 ? "#ff6b6b" : "#f5f5f5";
+});
+
+socket.on("turnSkipped", () => {
+  showMoveFeedback("Turn skipped — time ran out!", "error");
+  const timerEl = document.getElementById("turnTimer");
+  if (timerEl) timerEl.remove();
+});
+
 socket.on("rematchVoteUpdate", ({ acceptedCount, total }) => {
   const status = document.getElementById("rematchStatus");
   if (status && status.textContent.includes("Waiting")) {
@@ -970,6 +992,9 @@ function updateTurnDisplay() {
   if (!boardState || !boardState.currentTurn || !boardState.colorAssignments) {
     return; 
   }
+
+   const staleTimer = document.getElementById("turnTimer");
+  if (staleTimer) staleTimer.remove();
   
   const turnText = document.getElementById("turnText");
   const turnIndicator = document.getElementById("turnIndicator");
@@ -998,6 +1023,7 @@ async function showGame() {
         <div id="turnIndicator">
           <span id="turnText">Waiting for turn info...</span>
         </div>
+        <div id="turnTimer" style="text-align:center; font-size:1.1rem; font-weight:800; margin-top:6px; min-height:24px;"></div>
         <div id="scoreboard"></div>
         <div id="moveFeedback" class="move-feedback"></div>
         <div id="boardContainer"></div>
