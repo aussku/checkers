@@ -9,7 +9,7 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers, startTurnTimer) 
       if (!trimmedText) return;
 
       for (const [roomCode, room] of rooms.entries()) {
-        const player = room.players.find(p => p.id === socket.id);
+        const player = room.players.find(p => p.id === socket.sessionId);
         if (!player) continue;
 
         const message = {
@@ -67,7 +67,7 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers, startTurnTimer) 
 
   socket.on("requestGameState", () => {
     for (const [code, room] of rooms.entries()) {
-      if (room.players.some(p => p.id === socket.id)) {
+      if (room.players.some(p => p.id === socket.sessionId)) {
         if (room.gameState) {
           socket.emit("gameState", room.gameState);
         }
@@ -79,12 +79,12 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers, startTurnTimer) 
   socket.on("requestValidMoves", ({ roomCode, pieceId } = {}) => {
     try {
       const room = rooms.get(roomCode);
-      if (!room?.gameState || !pieceId) {
+      if (!room || !room.gameState || !pieceId) {
         socket.emit("validMoves", { pieceId, moves: [] });
         return;
       }
 
-      const moves = getLegalMovesForPiece(room.gameState, socket.id, pieceId, room.gameSettings?.forcedCaptures ?? false);
+      const moves = getLegalMovesForPiece(room.gameState, socket.sessionId, pieceId, room.gameSettings?.forcedCaptures ?? false);
       socket.emit("validMoves", { pieceId, moves });
     } catch (error) {
       console.error("requestValidMoves error:", error);
@@ -95,7 +95,13 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers, startTurnTimer) 
   socket.on("makeMove", ({ roomCode, pieceId, to }) => {
     try {
       const room = rooms.get(roomCode);
-      const result = applyMove(room.gameState, socket.id, pieceId, to, room.gameSettings?.forcedCaptures ?? false);
+
+      if (!room) {
+        socket.emit("moveError", { error: "Room not found. Please refresh." });
+        return;
+      }
+      
+      const result = applyMove(room.gameState, socket.sessionId, pieceId, to, room.gameSettings?.forcedCaptures ?? false);
       
       if (!result.ok) {
         socket.emit("invalidMove", { error: result.error });
@@ -108,7 +114,7 @@ function registerGameHandlers(io, socket, gameLogs, turnTimers, startTurnTimer) 
         delete turnTimers[roomCode];
       }
 
-      const player = room.players.find(p => p.id === socket.id);
+      const player = room.players.find(p => p.id === socket.sessionId);
       if (player) {
         if (!gameLogs[roomCode]) gameLogs[roomCode] = new GameLog();
 
