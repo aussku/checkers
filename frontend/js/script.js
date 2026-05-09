@@ -1,6 +1,14 @@
+let sessionId = sessionStorage.getItem("sessionId");
+if (!sessionId) {
+  sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  sessionStorage.setItem("sessionId", sessionId);
+}
+
 const content = document.getElementById("content");
 const menu = document.getElementById("menu");
-const socket = io();
+const socket = io({
+  auth: { sessionId }
+});
 
 let countdownActive = false;
 
@@ -124,7 +132,7 @@ socket.on("roomCreated", (data) => {
 socket.on("roomUpdate", (data) => {
   if (gameState.roomCode) {
     gameState.players = data.players;
-    if (data.hostId === socket.id) gameState.isHost = true;
+    if (data.hostId === sessionId) gameState.isHost = true;
     if (data.gameSettings) gameState.gameSettings = data.gameSettings;
     renderLobby();
   }
@@ -176,7 +184,12 @@ socket.on("gameStarted", (data) => {
   boardState = data.gameState;
   chatMessages = Array.isArray(data.chatMessages) ? data.chatMessages : [];
   gameLogEvents = [];
-  showGame();
+  
+  if (boardState && boardState.status === "finished") {
+    showEndScreen();
+  } else {
+    showGame();
+  }
 });
 
 socket.on("chatMessage", (message) => {
@@ -644,7 +657,7 @@ function hostGame() {
 function renderLobby() {
   const playerCount = gameState.players.length;
   const playersNeeded = 3 - playerCount;
-  const me = gameState.players.find(p => p.id === socket.id);
+  const me = gameState.players.find(p => p.id === sessionId);
   const isHost = gameState.isHost;
   const settings = gameState.gameSettings;
 
@@ -691,7 +704,7 @@ function renderLobby() {
           <span class="ready-state">${p.ready ? "Ready" : "Waiting"}</span>
           <span class="player-color-dot ${p.color || "blue"}"></span>
           <span>${escapeHtml(p.name || `Player ${i + 1}`)}</span>
-          ${p.id === socket.id ? "<strong>(You)</strong>" : ""}
+          ${p.id === sessionId ? "<strong>(You)</strong>" : ""}
         </li>
       `).join("")}
     </ul>
@@ -739,7 +752,7 @@ function joinGame() {
 // ---------------------------------------------------------------------------
 
 function getMyPlayerId() {
-  return socket.id;
+  return sessionId;
 }
 
 function getMyColor() {
@@ -1003,7 +1016,7 @@ function updateTurnDisplay() {
   const currentPlayerId = boardState.currentTurn;
   const currentColor = boardState.colorAssignments[currentPlayerId];
   
-  if (currentPlayerId === socket.id) {
+  if (currentPlayerId === sessionId) {
     turnText.textContent = "Your Turn!";
   } else {
     turnText.textContent = `${getPlayerLabel(currentPlayerId)}'s Turn`;
@@ -1015,6 +1028,7 @@ function updateTurnDisplay() {
 }
 
 async function showGame() {
+  menu.style.display = "none";
   content.style.display = "block";
   content.innerHTML = `
     <div class="game-layout">
@@ -1051,6 +1065,7 @@ async function showGame() {
 }
 
 function showEndScreen() {
+  menu.style.display = "none";
   content.style.display = "block";
   const rankings = (boardState?.rankings || []).slice().sort((a, b) => a.place - b.place);
   const winner = rankings.find(entry => entry.place === 1);
@@ -1065,7 +1080,7 @@ function showEndScreen() {
         <p>Winner: <strong style="color: ${winnerColor};">${winnerName}</strong></p>
         <div class="final-rankings">
           ${rankings.map(entry => {
-            const isMe = entry.playerId === socket.id;
+            const isMe = entry.playerId === sessionId;
             const colorName = entry.color.charAt(0).toUpperCase() + entry.color.slice(1);
             return `
               <p style="font-size: 1.1rem; margin: 5px 0; color: ${entry.color};">

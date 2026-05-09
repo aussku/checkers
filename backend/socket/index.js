@@ -49,16 +49,70 @@ function startTurnTimer(io, roomCode, gameLogs, turnTimers) {
 
 function initializeSocket(io, gameLogs) {
   const turnTimers = {};
+  const disconnectTimers = {}; // Track players during their grace period
+
+  // Middleware: Force sockets to identify with their sessionId
+  io.use((socket, next) => {
+    const sessionId = socket.handshake.auth.sessionId;
+    if (!sessionId) {
+      return next(new Error("Authentication error: No session ID"));
+    }
+    socket.sessionId = sessionId; // Attach it to the socket object
+    next();
+  });
 
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
+    console.log("User connected with Session:", socket.sessionId);
 
-    registerRoomHandlers(io, socket, turnTimers, gameLogs, startTurnTimer);
+    // --- AUTOMATIC RECONNECT LOGIC ---
+    for (const [code, room] of rooms.entries()) {
+      const player = room.players.find(p => p.id === socket.sessionId);
+      if (player) {
+        socket.join(code);
+        console.log(`Player ${player.name} reconnected to room ${code}`);
+
+        // If they had a destruction timer running, cancel it!
+        if (disconnectTimers[socket.sessionId]) {
+          clearTimeout(disconnectTimers[socket.sessionId]);
+          delete disconnectTimers[socket.sessionId];
+          
+          io.to(code).emit("chatMessage", {
+            id: Date.now().toString(),
+            playerName: "System",
+            playerColor: "#888",
+            text: `${player.name} reconnected.`,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        // 1. Send joinSuccess to set gameState.roomCode on the client
+        socket.emit("joinSuccess", {
+          code,
+          players: room.players,
+        });
+
+        // 2. Send roomUpdate to restore host status and settings
+        socket.emit("roomUpdate", {
+          code,
+          players: room.players,
+          hostId: room.hostId,
+          gameSettings: room.gameSettings,
+        });
+
+        // 3. Restore their exact board view
+        if (room.gameState) {
+          socket.emit("gameStarted", {
+            gameState: room.gameState,
+            chatMessages: room.chatMessages,
+          });
+        }
+        break; // Found their room, stop looking
+      }
+    }
+
+    // Pass disconnectTimers down so roomHandlers can use them
+    registerRoomHandlers(io, socket, turnTimers, gameLogs, startTurnTimer, disconnectTimers);
     registerGameHandlers(io, socket, gameLogs, turnTimers, startTurnTimer);
-
-    socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id);
-    });
   });
 }
 
