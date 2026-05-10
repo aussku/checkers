@@ -357,6 +357,7 @@ socket.on("rematchDeclined", () => {
 menu.addEventListener("click", (e) => {
   const id = e.target.id;
   if (id === "playBtn") showLobby();
+  if (id === "registerBtn") showRegistration();
   if (id === "rulesBtn") showRules();
   if (id === "settingsBtn") showSettings();
 });
@@ -450,6 +451,13 @@ content.addEventListener("submit", (e) => {
 
     const status = document.getElementById("settingsStatus");
     if (status) status.textContent = "Settings saved.";
+    return;
+  }
+
+  if (e.target.id === "registerForm") {
+    e.preventDefault();
+    handleRegistrationSubmit();
+    return;
   }
 });
 
@@ -648,6 +656,100 @@ function showSettings() {
     </form>
     <button id="backBtn">Back</button>
   `;
+}
+
+function showRegistration() {
+  menu.style.display = "none";
+  content.style.display = "block";
+  content.innerHTML = `
+    <h2>Register</h2>
+    <form id="registerForm" class="form-panel">
+      <label class="form-field" for="regUsername">
+        <span>Username</span>
+        <input id="regUsername" name="username" type="text" maxlength="30" placeholder="Enter username" autocomplete="username">
+      </label>
+
+      <label class="form-field" for="regEmail">
+        <span>Email</span>
+        <input id="regEmail" name="email" type="email" placeholder="you@example.com" autocomplete="email">
+      </label>
+
+      <label class="form-field" for="regPassword">
+        <span>Password</span>
+        <input id="regPassword" name="password" type="password" placeholder="Enter password" autocomplete="new-password">
+      </label>
+
+      <p id="registrationStatus" class="form-status" aria-live="polite"></p>
+      <button type="submit" id="submitRegistrationBtn">Create account</button>
+    </form>
+    <button id="backBtn">Back</button>
+  `;
+}
+
+function getRegistrationStatusElement() {
+  return document.getElementById("registrationStatus");
+}
+
+function setRegistrationStatus(message, isError = false) {
+  const status = getRegistrationStatusElement();
+  if (!status) return;
+  status.textContent = message;
+  status.className = `form-status${isError ? " error" : ""}`;
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+async function handleRegistrationSubmit() {
+  const username = document.getElementById("regUsername")?.value.trim() || "";
+  const email = document.getElementById("regEmail")?.value.trim() || "";
+  const password = document.getElementById("regPassword")?.value || "";
+
+  if (!username) {
+    setRegistrationStatus("Username is required.", true);
+    return;
+  }
+
+  if (!email) {
+    setRegistrationStatus("Email is required.", true);
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    setRegistrationStatus("Please enter a valid email.", true);
+    return;
+  }
+
+  if (!password) {
+    setRegistrationStatus("Password is required.", true);
+    return;
+  }
+
+  setRegistrationStatus("Registering...");
+
+  try {
+    const response = await fetch("/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setRegistrationStatus(data.error || "Registration failed.", true);
+      return;
+    }
+
+    setRegistrationStatus("Registration successful! You can now log in.");
+    document.getElementById("registerForm")?.reset();
+  } catch (error) {
+    console.error("Registration request failed", error);
+    setRegistrationStatus("Unable to connect to server.", true);
+  }
 }
 
 function hostGame() {

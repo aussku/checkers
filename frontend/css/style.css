@@ -150,7 +150,9 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
   filter: brightness(1.08);
 }
 
-#content input[type="text"]{
+#content input[type="text"],
+#content input[type="email"],
+#content input[type="password"]{
   width: 100%;
   border: 1px solid rgba(255,255,255,0.14);
   border-radius: 8px;
@@ -159,7 +161,39 @@ a:hover{ text-decoration-color: rgba(200,35,51,1); }
   padding: 10px 12px;
 }
 
+.form-panel,
+.settings-panel {
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+  margin-bottom: 8px;
+}
+
+.form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.form-field label,
+.form-field legend {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.form-status {
+  min-height: 24px;
+  margin: 0;
+  color: #7ee08f;
+  font-weight: 800;
+}
+
+.form-status.error {
+  color: #ff8d8d;
+}
+
 #content input[type="text"]:focus-visible,
+#content input[type="email"]:focus-visible,
+#content input[type="password"]:focus-visible,
 #content button:focus-visible,
 .color-option:focus-within{
   outline: 3px solid rgba(200,35,51,0.35);
